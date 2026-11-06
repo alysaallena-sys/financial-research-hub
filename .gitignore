@@ -1,0 +1,16 @@
+# Local state, credentials and acquired third-party material stay private.
+.local/
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite*
+*.db
+.env
+.env.*
+*.log
+*.pdf
+dist/
+build/
+*.egg-info/
+.DS_Store
+

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "financial-research-hub"
+version = "0.1.0"
+description = "Noncommercial financial information, research metadata and rating-change workspace."
+requires-python = ">=3.11"
+license = "LicenseRef-Financial-Research-Hub-NC-1.0"
+license-files = ["LICENSE", "NOTICE"]
+readme = "README.md"
+dependencies = []
+
+[project.optional-dependencies]
+ratings = ["yfinance>=1.8,<2"]
+
+[project.scripts]
+financial-research-hub = "finance_research_hub.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["finance_research_hub*"]
+
+[tool.setuptools.package-data]
+finance_research_hub = ["static/*"]
+

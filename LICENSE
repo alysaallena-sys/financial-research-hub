@@ -1,0 +1,93 @@
+Financial Research Hub Noncommercial License 1.0
+SPDX-License-Identifier: LicenseRef-Financial-Research-Hub-NC-1.0
+
+Copyright (c) 2026 Financial Research Hub contributors
+
+This is a source-available, noncommercial software license. It is not an
+OSI-approved open-source license. The permission below covers only material
+that its copyright holders can license. Third-party software, reports, data,
+trademarks and services keep their own terms.
+
+1. Permission
+
+Subject to these conditions, you may read, run, copy, modify and share this
+software for personal study, education, experimentation and other
+noncommercial research. You may also integrate it into a noncommercial
+editor, agent or knowledge base. Commercial use requires a separate written
+license from the relevant copyright holders.
+
+2. Noncommercial use
+
+You must not use the software, a modified version, or an integration based on
+it for commercial advantage, paid services, paid consulting, product sales,
+advertising revenue or work on behalf of a commercial business without that
+separate license. Charging no fee does not by itself make a business use
+noncommercial. This license does not authorize any investment transaction.
+
+3. Attribution and license retention
+
+When you share any part of the software or a modified version, preserve this
+license, the copyright attribution, NOTICE and the required risk notice.
+Identify substantial modifications. Do not claim that the original
+contributors endorse your version, your service or your conclusions.
+
+4. Required visible risk notice
+
+Required Notice: 投资有风险，分析结果和查询结果不构成投资建议。
+Required Notice: Investing involves risk. Analysis and query results do not constitute investment advice.
+
+The Chinese notice above is mandatory. If you use or adapt this software or
+its integration/export facilities in an editor, agent, retrieval system or
+knowledge base, you must visibly display it with every user-facing query
+result and analysis result that the integration produces. Keep it readable
+in the result view, generated answer or adjacent persistent result banner.
+A hidden metadata field, a collapsed terms page, or a one-time acceptance
+dialog alone does not satisfy this condition.
+
+Preserve the notice in every exported record and retrieval chunk, and in
+document, CSV, JSON and Markdown exports. Keep the notice when transforming
+formats, indexing content or passing retrieved material to another model or
+editor. An integration that cannot preserve the notice and display it must
+not present those results as a compliant Financial Research Hub integration.
+
+This condition governs permission to use this software and its integration
+facilities. It does not create ownership in third-party facts or grant new
+rights over third-party content. A repository cannot technically control an
+unrelated editor; the integrator is responsible for meeting this condition.
+
+5. Source and data rights
+
+Check each source's access rules, copyright, retention rules and usage terms.
+Public availability does not by itself permit bulk collection, storage or
+redistribution. This license grants no right to bypass logins, paywalls,
+CAPTCHAs, certificate checks or other access controls. It grants no license
+to third-party research reports, datasets or commercial databases.
+
+6. No warranty or investment advice
+
+The software and its results are supplied as is, without warranties to the
+extent permitted by law. Information can be delayed, incomplete or wrong.
+Query results, analysis results and examples do not constitute investment,
+legal or tax advice. You make your own decisions and bear their risks.
+Contributors do not guarantee returns, source coverage or uninterrupted
+service. To the extent permitted by law, contributors are not liable for
+losses arising from use of the software or its results.
+
+7. Compliance and termination
+
+Permission depends on compliance with these conditions. A use outside this
+permission requires a separate license. If you stop complying, stop the
+affected use and correct the violation. No rights that law makes
+nonwaivable are excluded. No contributor grants rights they do not own.
+
+中文要点（英文条款为完整许可文本）
+
+- 允许非商用的阅读、运行、修改、分享及知识库集成。
+- 商业用途需要相关权利人另行书面授权。
+- 分享时必须保留许可、署名、NOTICE 和风险提示。
+- 编辑器、智能体及知识库必须在每次查询或分析结果中可见展示：
+  投资有风险，分析结果和查询结果不构成投资建议。
+- 记录、检索分块和导出文件必须保留同一提示。隐藏元数据不能替代可见提示。
+- 第三方软件和数据各自适用原条款。本许可不授予第三方研报保存或再分发权。
+- 本项目无法从技术上强制控制未知的外部编辑器。集成方须履行上述条件。
+

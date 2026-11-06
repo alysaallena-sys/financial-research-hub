@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "contract_id": "financial-research-hub-editor-v1",
+  "project": "Financial Research Hub",
+  "license_id": "LicenseRef-Financial-Research-Hub-NC-1.0",
+  "noncommercial": true,
+  "risk_notice": "投资有风险，分析结果和查询结果不构成投资建议。",
+  "risk_notice_en": "Investing involves risk. Analysis and query results do not constitute investment advice.",
+  "visible_required": true,
+  "display_on": [
+    "query_result",
+    "analysis_result",
+    "generated_answer",
+    "knowledge_base_result"
+  ],
+  "accepted_display_locations": [
+    "result_text",
+    "readable_adjacent_persistent_result_banner"
+  ],
+  "insufficient_display": [
+    "hidden_metadata_only",
+    "collapsed_terms_only",
+    "one_time_dialog_only"
+  ],
+  "preserve_on": [
+    "record",
+    "retrieval_chunk",
+    "json_export",
+    "csv_export",
+    "markdown_export",
+    "format_conversion",
+    "indexing",
+    "model_or_editor_handoff"
+  ],
+  "required_record_metadata": [
+    "risk_notice",
+    "source",
+    "provider",
+    "published_at",
+    "is_demo"
+  ],
+  "missing_notice_policy": "Reject the import or regenerate compliant output before showing results.",
+  "source_rights": "Third-party source terms remain independent. This contract grants no report or dataset redistribution rights.",
+  "technical_limit": "This repository cannot force an unrelated editor to display a notice. The integrator must implement and verify visible display.",
+  "acceptance": [
+    "A user can see the exact Chinese notice beside every query and analysis result.",
+    "Every exported record and retrieval chunk retains the notice.",
+    "Demo content remains visibly marked after import and retrieval.",
+    "License, attribution and source references survive format conversion."
+  ]
+}
+
