@@ -21,7 +21,9 @@ The bundled interface currently uses Simplified Chinese. Repository documentatio
 | Overseas analyst ratings | Yahoo-aggregated rating events through the optional yfinance adapter |
 | Change history | Local SQLite snapshots that distinguish first observation, new records, updates and unchanged records |
 | Search and briefs | Filters for type, source, symbol and keywords, plus source-linked metadata briefs |
+| Connected research | Exact record lookup, scoped history, provenance, coverage and retrieval chunks in one research pack |
 | Knowledge-base exports | JSON, CSV, Markdown and retrieval chunks that retain risk notices, sources and demo labels |
+| Read-only MCP | Seven tools, policy/catalog/schema resources, an exact-record resource template and a research prompt over one existing local database |
 
 Available report fields depend on the selected interface. A report-list record does not contain the report's full text. A rating event does not contain an investment bank's complete reasoning. Programs that share Eastmoney or Yahoo still share the same direct data provider.
 
@@ -54,6 +56,33 @@ python -m finance_research_hub --db .local/demo.sqlite3 export --format jsonl
 ```
 
 Use `python -m finance_research_hub --help` and each subcommand's help for the current options. Omitting `--db` selects `.local/research.sqlite3`. JSON includes records and retrieval chunks with notices; JSONL emits one chunk per line. Empty JSONL and CSV exports still contain one `record_type: notice` entry. It is a notice, not a research item; importers must distinguish the types. Search and export read the local database without starting collection, model calls or PDF downloads.
+
+## Connected research workflow
+
+Search saved metadata, select an exact record, inspect its own changes, and build a pack containing sources, coverage, missing information and notice-preserving retrieval chunks. Replace `RECORD_ID` below with an actual stable ID returned by the query:
+
+```sh
+python -m finance_research_hub --db .local/demo.sqlite3 query --kind research
+python -m finance_research_hub --db .local/demo.sqlite3 record RECORD_ID --history-limit 20
+python -m finance_research_hub --db .local/demo.sqlite3 pack --record-id RECORD_ID --limit 20 --history-limit 20
+```
+
+You can also select a pack with an exact `--symbol` or literal `--q`. Matching metadata establishes the selection rule, not a causal connection or independent corroboration. An untagged anchor stays anchor-only unless you explicitly supply a topic. See the [coverage matrix](docs/COVERAGE.md).
+
+In the page's research workflow, the JSON pack export retains provenance, history, coverage and retrieval chunks. The Markdown option exports a material summary containing entries and summaries; it does not contain the complete pack. Its filename is `research-summary-YYYY-MM-DD.md`, while the JSON pack uses `research-pack-YYYY-MM-DD.json`.
+
+## Connect through MCP
+
+The optional adapter uses the official Python SDK, pinned to `mcp==2.3.0`:
+
+```sh
+python -m pip install '.[mcp]'
+python -m finance_research_hub.mcp_server --db .local/demo.sqlite3
+```
+
+The MCP host normally launches the second command. Stdio uses stdin/stdout, not an HTTP port. The database must already exist; MCP opens SQLite with `mode=ro` and cannot create tables, change records or acquire live sources. It offers saved-workspace search, exact records, scoped changes, research packs and exports, with the risk notice in both text and structured results.
+
+Local SDK acceptance passed in both `auto` (`2026-07-28`) and `legacy` (`2025-11-25`) modes. This does not establish acceptance in an arbitrary editor or prove that its UI displays the notice. Read the [MCP guide](docs/MCP.md), review the [host configuration example](integrations/mcp-stdio.example.json), and use the [SDK-client acceptance helper](integrations/mcp_client_acceptance.py) with a dedicated synthetic database. No global client registration is performed.
 
 ## Optional live metadata collection
 

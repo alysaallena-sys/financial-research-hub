@@ -8,15 +8,16 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from .core import Store, brief, envelope, export_items
-from .providers import source_catalog
+from . import __version__
+from .core import Store, envelope
+from .service import ResearchWorkspace
 
 STATIC = Path(__file__).parent / "static"
 
 
 def make_handler(db_path: str, static_dir: Path = STATIC) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
-        server_version = "FinancialResearchHub/0.1"
+        server_version = "FinancialResearchHub/" + __version__
 
         def log_message(self, *_: Any) -> None:
             # Do not log search queries or acquired-source contents by default.
@@ -51,8 +52,10 @@ def make_handler(db_path: str, static_dir: Path = STATIC) -> type[BaseHTTPReques
                 self.send_json(envelope([], error="Only the matching loopback origin is allowed"), 403)
                 return
             parsed = urlsplit(self.path)
-            args = parse_qs(parsed.query, keep_blank_values=True)
             try:
+                if len(parsed.query) > 4096:
+                    raise ValueError("Query string exceeds 4096 characters")
+                args = parse_qs(parsed.query, keep_blank_values=True, max_num_fields=16)
                 if parsed.path.startswith("/api/"):
                     self.api(parsed.path, args)
                     return
@@ -74,25 +77,29 @@ def make_handler(db_path: str, static_dir: Path = STATIC) -> type[BaseHTTPReques
             limit = int(one("limit", "100"))
             filters = {key: one(key) for key in ("kind", "provider", "symbol", "q")}
             filters["limit"] = limit
-            with Store(db_path) as store:
-                if path == "/api/items":
-                    items = store.query(**filters)
-                    self.send_json(envelope(items, limit=limit, returned=len(items), completeness="query limited to requested maximum"))
-                elif path == "/api/status":
-                    self.send_json(store.status())
-                elif path == "/api/changes":
-                    self.send_json(envelope(store.changes(limit), limit=limit))
-                elif path == "/api/sources":
-                    collections = store.collections()
-                    self.send_json(envelope([], sources=source_catalog(collections), collections=collections,
-                                            network_enabled=False, note="Adapter availability is not live-source acceptance."))
-                elif path == "/api/brief":
-                    self.send_json(brief(store.query(**filters)))
-                elif path == "/api/export":
-                    data, content_type = export_items(store.query(**filters), one("format", "json"))
-                    self.send_body(data, content_type)
-                else:
-                    self.send_json(envelope([], error="Not found"), 404)
+            workspace = ResearchWorkspace(db_path, store_factory=Store)
+            if path == "/api/items":
+                self.send_json(workspace.search(**filters))
+            elif path == "/api/status":
+                self.send_json(workspace.status())
+            elif path == "/api/changes":
+                self.send_json(workspace.changes(record_id=one("record_id"), limit=limit))
+            elif path == "/api/sources":
+                self.send_json(workspace.sources())
+            elif path == "/api/brief":
+                self.send_json(workspace.brief(**filters))
+            elif path == "/api/export":
+                result = workspace.export(one("format", "json"), **filters)
+                self.send_body(result["content"], result["content_type"])
+            elif path.startswith("/api/records/"):
+                result = workspace.get_record(unquote(path[len("/api/records/"):]), history_limit=int(one("history_limit", "50")))
+                self.send_json(result, 200 if result["found"] else 404)
+            elif path == "/api/pack":
+                result = workspace.research_pack(record_id=one("record_id"), symbol=one("symbol"), q=one("q"),
+                                                 limit=limit, history_limit=int(one("history_limit", "20")))
+                self.send_json(result, 404 if result.get("missing_reason") else 200)
+            else:
+                self.send_json(envelope([], error="Not found"), 404)
 
         def do_POST(self) -> None:
             self.send_json(envelope([], error="Read-only server; use the explicit local CLI for collection"), 405)

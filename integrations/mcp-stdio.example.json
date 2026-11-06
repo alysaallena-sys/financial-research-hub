@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "financial-research-hub": {
+      "command": "/absolute/path/to/venv/bin/python",
+      "args": [
+        "-m",
+        "finance_research_hub.mcp_server",
+        "--db",
+        "/absolute/path/to/local/research.sqlite3"
+      ]
+    }
+  }
+}
+

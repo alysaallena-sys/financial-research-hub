@@ -11,7 +11,7 @@
     talk: "查看公开演讲与 TED 条目，保留原始页面与发表时间。"
   };
   const $ = (id) => document.getElementById(id);
-  const state = {kind: "", items: [], sources: [], changes: [], request: 0, demo: false, libraryMode: null, toastTimer: null};
+  const state = {kind: "", items: [], sources: [], changes: [], request: 0, demo: false, libraryMode: null, toastTimer: null, packRequest: 0, selectedRecord: null, recordDetail: null, packPayload: null};
   const statusLabels = {ready: "可查询", available: "接口已配置", enabled: "已配置", disabled: "未启用", candidate: "候选", demo: "合成演示", not_collected: "尚未采集", unavailable: "不可用", optional: "可选依赖", optional_dependency: "需可选依赖", reference_only: "参考入口", configured: "已配置", success: "已采集", ok: "已配置"};
 
   function element(tag, className, text) {
@@ -121,6 +121,11 @@
       meta.append(element("span", "", item.institution || item.source || "机构未提供"));
       meta.append(element("span", "", dateText(item.published_at)));
       if (safeUrl(item.url)) meta.append(element("span", "", "原始来源 ↗"));
+      const researchButton = element("button", "record-link-button", "关联研究 ↗");
+      researchButton.type = "button";
+      researchButton.setAttribute("aria-label", `关联研究：${item.title || "此记录"}`);
+      researchButton.addEventListener("click", () => openResearch(item));
+      meta.append(researchButton);
       row.append(top, heading, meta);
       const details = element("details", "result-details");
       details.append(element("summary", "", "摘要与来源信息"));
@@ -310,6 +315,219 @@
     finally { button.disabled = false; }
   }
 
+  function packBusy(active, message = "正在汇集本地资料…") {
+    $("pack-load").disabled = active;
+    $("pack-export").disabled = active || !state.packPayload;
+    $("research-pack").setAttribute("aria-busy", String(active));
+    if (active) {
+      $("pack-error").hidden = true;
+      $("pack-status").textContent = message;
+    }
+  }
+  function setPackScope(kind, value = "") {
+    $("pack-scope-kind").value = kind;
+    $("pack-scope-input").value = value;
+    const symbol = kind === "symbol";
+    $("pack-scope-label").textContent = symbol ? "证券标识" : "主题关键词";
+    $("pack-scope-input").placeholder = symbol ? "如 AAPL / 600519" : "输入需要关联的主题词";
+    $("pack-scope-note").textContent = symbol ? "按相同证券标识关联本地记录，不触发联网采集或模型调用。" : "按给定关键词匹配本地记录。字面匹配不代表相同观点、因果关系或独立核验。";
+  }
+  function renderSelectedRecord(record) {
+    const box = $("pack-selected"); box.replaceChildren();
+    if (!record) { box.append(element("p", "pack-empty", "未选中记录。")); return; }
+    const top = element("div", "result-topline");
+    top.append(element("span", `kind-tag ${record.kind || ""}`, KIND[record.kind] || "资料"));
+    if (record.is_demo) top.append(element("span", "demo-tag", "合成样例"));
+    if (record.symbol) top.append(element("span", "symbol-tag", record.symbol));
+    top.append(element("span", "source-inline", "当前研究起点"));
+    const title = element("h3", "result-title"); title.append(sourceLink(record.url, record.title || "未命名记录"));
+    const meta = element("div", "result-meta");
+    meta.append(element("span", "", record.institution || record.source || "机构未提供"), element("span", "", dateText(record.published_at)));
+    box.append(top, title, meta);
+  }
+  function provenanceEntry(grid, label, value, link = false) {
+    if (value === undefined || value === null || value === "") return;
+    const field = element("dd");
+    if (link) field.append(sourceLink(value, value)); else field.textContent = cleanText(value);
+    grid.append(element("dt", "", label), field);
+  }
+  function renderRecordDetail(payload) {
+    const record = payload.record || payload.item || asList(payload)[0] || state.selectedRecord;
+    if (record) { state.selectedRecord = record; renderSelectedRecord(record); }
+    const provenance = payload.provenance || {};
+    const metadata = record?.metadata || {};
+    const grid = $("pack-provenance"); grid.replaceChildren();
+    provenanceEntry(grid, "记录提供方", provenance.provider || record?.provider || "未提供");
+    provenanceEntry(grid, "直接数据源", provenance.direct_provider || metadata.direct_provider || record?.provider || "未提供");
+    provenanceEntry(grid, "原始发布者", provenance.original_publisher || metadata.original_publisher || record?.institution || record?.source || "未提供");
+    provenanceEntry(grid, "原始来源", provenance.source_url || provenance.url || record?.url, true);
+    provenanceEntry(grid, "发表时间", dateText(provenance.published_at || record?.published_at, true));
+    provenanceEntry(grid, "收录时间", provenance.retrieved_at || record?.retrieved_at ? dateText(provenance.retrieved_at || record?.retrieved_at, true) : "未提供");
+    provenanceEntry(grid, "记录标识", record?.id);
+    provenanceEntry(grid, "内容范围", provenance.content_scope || metadata.content_scope || "本地元数据；未读取研报或文章全文");
+    renderRecordHistory(payload.history || payload.changes || []);
+  }
+  function renderRecordHistory(payload) {
+    const rows = asList(payload, ["items", "history", "changes"]);
+    const list = $("pack-history"); list.replaceChildren();
+    if (!rows.length) { list.append(element("li", "pack-empty", "此记录暂无已保存的更新历史。")); return; }
+    const total = payload.total_matches ?? rows.length;
+    rows.slice(0, 10).forEach((change) => {
+      const type = change.change_type || change.type || "new";
+      const li = element("li"); const label = element("div", "change-label");
+      label.append(element("span", `change-badge ${type === "updated" ? "updated" : ""}`, type === "updated" ? "更新" : "首次收录"));
+      label.append(element("span", "history-time", change.observed_at ? dateText(change.observed_at, true) : "观察时间未提供"));
+      li.append(label);
+      if (type === "updated" && change.before && change.after) {
+        const fields = [["title", "标题"], ["summary", "摘要"], ["institution", "机构"], ["published_at", "发表时间"], ["metadata", "附加数据"]];
+        const changed = fields.filter(([key]) => JSON.stringify(change.before[key]) !== JSON.stringify(change.after[key])).map(([, name]) => name);
+        li.append(element("p", "", changed.length ? `变化字段：${changed.join("、")}。` : "此条记录的内容指纹发生变化。"));
+      } else li.append(element("p", "", "这是本地首次观察记录；原始发表时间另行保留。"));
+      list.append(li);
+    });
+    if (total > 10 || payload.truncated) list.append(element("li", "pack-empty", `当前显示 ${Math.min(rows.length, 10)} 条，本地共匹配 ${total} 条历史。`));
+  }
+  function renderPackCoverage(payload) {
+    const box = $("pack-coverage"); box.replaceChildren();
+    const coverage = payload.coverage || {};
+    const returned = coverage.returned ?? asList(payload).length;
+    const total = coverage.total_matches ?? returned;
+    box.append(element("p", "", `本次返回 ${returned} 条，本地共匹配 ${total} 条。`));
+    box.append(element("p", "", coverage.truncated ? "本地匹配结果已截断；当前资料包不含全部匹配记录。" : "本地查询未标记截断；这不表示上游资料完整。"));
+    const missing = payload.missing_kinds || coverage.missing_kinds || [];
+    if (Array.isArray(missing) && missing.length) box.append(element("p", "", `本次缺少：${missing.map((kind) => KIND[kind] || kind).join("、")}。`));
+    if (Array.isArray(coverage.missing_publication_ids) && coverage.missing_publication_ids.length) box.append(element("p", "", `${coverage.missing_publication_ids.length} 条记录未提供原始发表时间。`));
+    if (coverage.history_truncated) box.append(element("p", "", "资料包中的历史记录已截断，不能据此判断全部历史变化。"));
+    const sourceCollections = coverage.provider_collections || coverage.collections || payload.collections || [];
+    if (Array.isArray(sourceCollections) && sourceCollections.length) {
+      const list = element("ul");
+      sourceCollections.forEach((collection) => list.append(element("li", "", `${collection.provider || "来源"}：${collection.returned_records ?? "未提供"} 条；${collection.truncated === true ? "存在截断" : collection.truncated === false ? "该次未标记截断" : "完整性未知"}`)));
+      box.append(list);
+    }
+    box.append(element("p", "", "资料包只汇集已保存的元数据。未执行联网补全、正文阅读或模型分析。"));
+  }
+  function packBasisText(payload) {
+    const selection = payload.selection || {};
+    if (selection.basis === "anchor_only") return "关联依据：仅选中记录；可填写主题关键词继续汇集";
+    if (selection.basis === "missing_anchor") return "未找到选中记录，无法建立关联范围";
+    if (selection.symbol && selection.q) return `关联依据：证券标识 ${selection.symbol}，且包含关键词“${selection.q}”`;
+    if (selection.symbol) return `关联依据：证券标识 ${selection.symbol}`;
+    if (selection.q) return `关联依据：关键词“${selection.q}”的本地字面匹配`;
+    if (selection.record_id || payload.anchor) return "关联依据：选中记录及服务返回的本地匹配范围";
+    return "关联依据：本次指定的本地查询范围";
+  }
+  function renderPack(payload) {
+    state.packPayload = payload;
+    const items = asList(payload, ["items", "records"]);
+    $("pack-count").textContent = `${items.length} 条资料`;
+    $("pack-match-note").textContent = packBasisText(payload);
+    const list = $("pack-items"); list.replaceChildren();
+    if (!items.length) list.append(element("li", "pack-empty", "当前范围没有本地匹配记录。请调整证券标识或主题关键词。"));
+    items.forEach((item) => {
+      const selected = state.selectedRecord?.id === item.id;
+      const li = element("li", selected ? "pack-item-selected" : "");
+      const top = element("div", "result-topline");
+      top.append(element("span", `kind-tag ${item.kind || ""}`, KIND[item.kind] || "资料"));
+      if (item.is_demo) top.append(element("span", "demo-tag", "合成样例"));
+      if (selected) top.append(element("span", "symbol-tag", "研究起点"));
+      const title = element("p", "pack-item-title"); title.append(sourceLink(item.url, item.title || "未命名记录"));
+      const meta = element("div", "pack-item-meta");
+      meta.append(element("span", "", item.institution || item.source || "机构未提供"), element("span", "", dateText(item.published_at)));
+      if (item.symbol) meta.append(element("span", "", item.symbol));
+      const actions = element("div", "pack-item-actions");
+      actions.append(element("span", "pack-item-meta", `直接提供方：${item.metadata?.direct_provider || item.provider || "未提供"}`));
+      const button = element("button", "text-button", selected ? "刷新来源与历史" : "以此条继续研究 ↗");
+      button.type = "button"; button.addEventListener("click", () => openResearch(item)); actions.append(button);
+      li.append(top, title, meta, actions, element("p", "pack-item-risk", RISK)); list.append(li);
+    });
+    const brief = payload.brief;
+    let text = typeof brief === "string" ? brief : brief?.text || "本次资料包未提供摘要。";
+    if (!text.includes(RISK)) text = `${RISK}\n\n${text}`;
+    $("pack-brief-text").textContent = text;
+    renderPackCoverage(payload);
+    $("pack-content").hidden = false;
+    const selection = payload.selection || {};
+    const inPack = state.selectedRecord ? items.some((item) => item.id === state.selectedRecord.id) : true;
+    const demo = items.some((item) => item.is_demo) ? " · 含合成演示数据" : "";
+    const anchorExcluded = Boolean(selection.record_id) && selection.anchor_in_selection === false;
+    $("pack-status").textContent = `已汇集 ${items.length} 条本地资料${demo}。${!inPack || anchorExcluded ? "选中起点不在当前匹配结果中。" : ""}`;
+  }
+  async function fetchPack(query, seq) {
+    const payload = await request(`/api/pack?${query}`);
+    if (seq !== state.packRequest) return;
+    renderPack(payload);
+  }
+  async function openResearch(item) {
+    const seq = ++state.packRequest;
+    state.selectedRecord = item; state.recordDetail = null; state.packPayload = null;
+    $("research-pack").hidden = false; $("pack-content").hidden = true;
+    $("pack-provenance").replaceChildren(); $("pack-history").replaceChildren();
+    renderSelectedRecord(item); setPackScope(item.symbol ? "symbol" : "q", item.symbol || $("query-input").value.trim());
+    packBusy(true, "正在读取选中记录的来源与历史…");
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    $("research-pack").scrollIntoView({behavior: reduceMotion ? "auto" : "smooth", block: "start"});
+    $("pack-heading").focus({preventScroll: true});
+    try {
+      const detail = await request(`/api/records/${encodeURIComponent(item.id)}?history_limit=50`);
+      if (seq !== state.packRequest) return;
+      state.recordDetail = detail; renderRecordDetail(detail);
+      const selector = detail.related_selector || {};
+      if (selector.symbol) setPackScope("symbol", selector.symbol);
+      else if (selector.q && !$("pack-scope-input").value.trim()) setPackScope("q", selector.q);
+      await fetchPack(new URLSearchParams({record_id: item.id, limit: "100", history_limit: "20"}), seq);
+    } catch (error) {
+      if (seq !== state.packRequest) return;
+      $("pack-error").textContent = `关联研究暂时不可用：${error.message}`; $("pack-error").hidden = false;
+      $("pack-status").textContent = "未取得资料包。请调整范围后重试。";
+    } finally { if (seq === state.packRequest) packBusy(false); }
+  }
+  async function submitPack(event) {
+    event.preventDefault();
+    const value = $("pack-scope-input").value.trim();
+    if (!value) { $("pack-scope-input").focus(); toast("请先填写证券标识或主题关键词。"); return; }
+    const seq = ++state.packRequest; state.packPayload = null;
+    $("pack-content").hidden = true; packBusy(true);
+    const query = new URLSearchParams({limit: "100", history_limit: "20"});
+    const scopeKind = $("pack-scope-kind").value;
+    query.set(scopeKind, value);
+    if (state.selectedRecord?.id && (scopeKind === "q" || value === state.selectedRecord.symbol)) {
+      query.set("record_id", state.selectedRecord.id);
+    }
+    try { await fetchPack(query, seq); }
+    catch (error) {
+      if (seq !== state.packRequest) return;
+      $("pack-error").textContent = `资料包读取失败：${error.message}`; $("pack-error").hidden = false;
+      $("pack-status").textContent = "读取失败。请检查范围后重试。";
+    } finally { if (seq === state.packRequest) packBusy(false); }
+  }
+  function markdownText(value) {
+    return cleanText(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/([\\`*_{}\[\]()#+.!|~])/g, "\\$1");
+  }
+  function exportPack() {
+    const payload = state.packPayload;
+    if (!payload) { toast("请先汇集本地资料，再导出资料包。"); return; }
+    const format = $("pack-export-format").value;
+    const exportPayload = {...payload, risk_notice: RISK, noncommercial: true, editor_notice_required: true};
+    let text;
+    if (format === "json") text = JSON.stringify(exportPayload, null, 2);
+    else {
+      const items = asList(payload, ["items", "records"]);
+      const lines = [RISK, "", "# 关联研究资料包", "", "仅供非商用研究与学习。接收的编辑器或知识库必须在查询和分析结果中显示风险提示。", "", markdownText(packBasisText(payload)), "", `本次返回 ${items.length} 条本地元数据；${payload.coverage?.truncated ? "结果已截断" : "本地查询未标记截断，不代表上游完整覆盖"}。`, ""];
+      items.forEach((item) => {
+        lines.push(`## ${markdownText(item.title)}`, "", RISK, "", item.is_demo ? "**合成演示数据。**" : "原始来源与内容取用条件仍适用。", "", `- 类型：${markdownText(KIND[item.kind] || item.kind)}`, `- 标的：${markdownText(item.symbol || "未提供")}`, `- 发布机构：${markdownText(item.institution || item.source || "未提供")}`, `- 直接提供方：${markdownText(item.metadata?.direct_provider || item.provider || "未提供")}`, `- 发表时间：${markdownText(item.published_at || "未提供")}`, `- 收录时间：${markdownText(item.retrieved_at || "未提供")}`, `- 原始链接：${markdownText(safeUrl(item.url) || "链接未提供或未通过HTTPS校验")}`, "", markdownText(item.summary || "此记录仅含目录信息；未读取全文。"), "");
+      });
+      const brief = typeof payload.brief === "string" ? payload.brief : payload.brief?.text;
+      if (brief) lines.push("## 资料摘要", "", RISK, "", markdownText(brief), "");
+      text = lines.join("\n");
+    }
+    if (!text.includes(RISK)) { toast("资料包缺少风险提示，已阻止导出。"); return; }
+    const blob = new Blob([text], {type: format === "json" ? "application/json;charset=utf-8" : "text/markdown;charset=utf-8"});
+    const url = URL.createObjectURL(blob); const anchor = element("a");
+    anchor.href = url; anchor.download = `${format === "json" ? "research-pack" : "research-summary"}-${new Date().toISOString().slice(0, 10)}.${format === "json" ? "json" : "md"}`;
+    document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast(`${format === "json" ? "已导出本地资料包" : "已导出本地资料摘要"}。接收的编辑器必须显示风险提示。`);
+  }
+
   document.querySelectorAll("[data-kind]").forEach((button) => button.addEventListener("click", () => setKind(button.dataset.kind)));
   document.querySelectorAll("[data-filter-kind]").forEach((button) => button.addEventListener("click", () => setKind(button.dataset.filterKind)));
   $("search-form").addEventListener("submit", (event) => { event.preventDefault(); loadItems(); });
@@ -321,5 +539,9 @@
   $("retry-button").addEventListener("click", refresh);
   $("brief-button").addEventListener("click", loadBrief);
   $("export-button").addEventListener("click", exportData);
+  $("pack-form").addEventListener("submit", submitPack);
+  $("pack-scope-kind").addEventListener("change", () => setPackScope($("pack-scope-kind").value, ""));
+  $("pack-export").addEventListener("click", exportPack);
+  $("pack-close").addEventListener("click", () => { ++state.packRequest; $("research-pack").hidden = true; packBusy(false); $("results-heading").focus({preventScroll: true}); });
   refresh();
 })();

@@ -1,6 +1,7 @@
 # Local state, credentials and acquired third-party material stay private.
 .local/
 .venv/
+.venv-mcp/
 __pycache__/
 *.py[cod]
 *.sqlite*

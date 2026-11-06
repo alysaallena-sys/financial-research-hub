@@ -26,7 +26,7 @@
         <button class="nav-item" type="button" data-kind="talk"><span class="nav-icon" aria-hidden="true">▷</span>TED 与演讲<span class="nav-key">05</span></button>
       </nav>
       <div class="sidebar-note"><span class="small-dot" aria-hidden="true"></span>本地资料库<span>查询、筛选与导出均读取本地记录。</span></div>
-      <div class="sidebar-bottom"><span class="license-badge">NONCOMMERCIAL</span><p>仅供非商用研究与学习。<br>保留来源，核对原文。</p><span class="sidebar-version">Financial Research Hub · 0.1</span></div>
+      <div class="sidebar-bottom"><span class="license-badge">NONCOMMERCIAL</span><p>仅供非商用研究与学习。<br>保留来源，核对原文。</p><span class="sidebar-version">Financial Research Hub · 0.2.0</span></div>
     </aside>
 
     <div class="workspace">
@@ -46,9 +46,33 @@
           <div class="metric"><span>本地变更</span><strong id="metric-changes">—</strong><small>已记录的新增与更新</small></div>
         </section>
 
+        <section class="panel research-pack" id="research-pack" aria-labelledby="pack-heading" hidden>
+          <div class="panel-heading"><div><div class="eyebrow">LINKED RESEARCH</div><h2 id="pack-heading" tabindex="-1">关联研究资料包</h2><p>从一条记录出发，查看本地相关资料、来源链与更新历史。</p></div><button type="button" class="text-button" id="pack-close">收起 <span aria-hidden="true">×</span></button></div>
+          <p class="pack-risk">投资有风险，分析结果和查询结果不构成投资建议。</p>
+          <div class="pack-body">
+            <div id="pack-selected" class="pack-selected"></div>
+            <form id="pack-form" class="pack-form">
+              <div class="field"><label for="pack-scope-kind">关联方式</label><select id="pack-scope-kind"><option value="symbol">相同证券标识</option><option value="q">主题关键词</option></select></div>
+              <div class="field pack-query-field"><label for="pack-scope-input" id="pack-scope-label">证券标识</label><input id="pack-scope-input" type="text" placeholder="如 AAPL / 600519" autocomplete="off" spellcheck="false"></div>
+              <button type="submit" class="button" id="pack-load">汇集本地资料</button>
+            </form>
+            <p class="pack-scope-note" id="pack-scope-note">按证券标识关联本地记录，不触发联网采集或模型调用。</p>
+            <div id="pack-status" class="pack-status" role="status" aria-live="polite">选择一条记录后开始。</div>
+            <div id="pack-error" class="error-box" role="alert" hidden></div>
+            <div id="pack-content" hidden>
+              <div class="pack-toolbar"><div><strong id="pack-count">0 条资料</strong><span id="pack-match-note"></span></div><div class="export-actions"><label for="pack-export-format" class="sr-only">资料包导出格式</label><select id="pack-export-format"><option value="json">JSON 资料包</option><option value="markdown">Markdown 资料摘要</option></select><button type="button" class="text-button" id="pack-export">导出资料包 <span aria-hidden="true">↗</span></button></div></div>
+              <div class="pack-grid">
+                <div class="pack-materials"><h3>本地相关资料</h3><p class="pack-section-note">按明确标识或关键词匹配。关联记录不代表相互印证。</p><ol id="pack-items" class="pack-items"></ol><details class="pack-brief"><summary>查看资料摘要</summary><pre id="pack-brief-text" class="brief-text"></pre><p class="compact-risk">投资有风险，分析结果和查询结果不构成投资建议。</p></details></div>
+                <div class="pack-context"><section><h3>选中记录的来源链</h3><dl id="pack-provenance" class="metadata-grid"></dl></section><section><h3>选中记录的更新历史</h3><ol id="pack-history" class="pack-history"></ol></section><section><h3>采集范围与缺口</h3><div id="pack-coverage" class="pack-coverage"></div></section></div>
+              </div>
+              <p class="pack-export-note">JSON 保留完整来源、历史、覆盖范围与检索片段；Markdown 导出条目与摘要。接收的编辑器或知识库必须在查询和分析结果中显示风险提示。</p>
+            </div>
+          </div>
+        </section>
+
         <div class="workspace-grid">
           <section class="panel results-panel" aria-labelledby="results-heading">
-            <div class="panel-heading"><div><h2 id="results-heading" tabindex="-1">资讯与研报</h2><p>查询结果保留来源与日期。研报列表不等于正文。</p></div><span id="result-count" class="count-badge">— 条</span></div>
+            <div class="panel-heading"><div><h2 id="results-heading" tabindex="-1">资讯与研报</h2><p>选择“关联研究”，汇集相关资料、来源与更新历史。</p></div><span id="result-count" class="count-badge">— 条</span></div>
             <form id="search-form" class="filter-form" role="search">
               <div class="search-field"><label for="query-input" class="sr-only">搜索标题、机构或摘要</label><span aria-hidden="true">⌕</span><input id="query-input" name="q" type="search" placeholder="搜索标题、机构或主题" autocomplete="off"><button type="submit">查询</button></div>
               <div class="filter-row"><div class="field"><label for="provider-select">数据来源</label><select id="provider-select" name="provider"><option value="">全部来源</option></select></div><div class="field symbol-field"><label for="symbol-input">证券标识</label><input id="symbol-input" name="symbol" type="text" placeholder="如 AAPL / 600519" autocomplete="off" spellcheck="false"></div><button class="clear-button" id="clear-filters" type="button">清除筛选</button></div>

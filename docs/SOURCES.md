@@ -65,3 +65,11 @@ The base GitHub Actions configuration references the [GitHub Python testing docu
 - [`actions/setup-python` v7](https://github.com/actions/setup-python/tree/6d4fd22b20465ccc0f7354476588e8df7c9ca0e0): `6d4fd22b20465ccc0f7354476588e8df7c9ca0e0`.
 
 The workflow runs offline tests only. It does not schedule collection from financial sources. Preparing Actions and Python can connect to GitHub; the tests themselves do not request information feeds or research-report interfaces.
+
+## Official MCP dependency and protocol references
+
+The optional MCP extra pins the official [Python SDK v2.3.0](https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.3.0) at commit [`2118f14f8a19bc158d8a1cf90af58d85d187f849`](https://github.com/modelcontextprotocol/python-sdk/tree/2118f14f8a19bc158d8a1cf90af58d85d187f849). The SDK is MIT-licensed; it is an optional dependency, not vendored source. This project's original code retains its noncommercial license.
+
+The fixed SDK [protocol registry](https://github.com/modelcontextprotocol/python-sdk/blob/2118f14f8a19bc158d8a1cf90af58d85d187f849/src/mcp-types/mcp_types/version.py) includes both the `2025-11-25` handshake era and the `2026-07-28` per-request era. The corresponding primary specifications are [2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) and [2026-07-28 changes](https://modelcontextprotocol.io/specification/2026-07-28/changelog). Local acceptance in both SDK modes does not establish behavior in every external host.
+
+Implementation uses the official high-level `MCPServer`, `Client` and `StdioServerParameters` APIs. See [the MCP guide](MCP.md) for fixed examples, result-channel behavior and the version-pinned process-observation instrumentation used only by the standalone acceptance helper.

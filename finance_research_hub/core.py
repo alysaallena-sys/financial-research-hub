@@ -4,10 +4,12 @@ from __future__ import annotations
 import csv
 import hashlib
 import html
+import heapq
 import io
 import json
 import sqlite3
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -16,6 +18,7 @@ from urllib.parse import urlsplit
 from . import LICENSE_ID, RISK_NOTICE, RISK_NOTICE_EN
 
 KINDS = {"news", "talk", "research", "rating"}
+READ_DEADLINE_SECONDS = 5.0
 
 
 def utc_now() -> str:
@@ -98,8 +101,20 @@ def envelope(items: list[dict[str, Any]], **extra: Any) -> dict[str, Any]:
 class Store:
     """All acquired state stays in the explicitly chosen local SQLite file."""
 
-    def __init__(self, path: str | Path):
+    def __init__(self, path: str | Path, *, read_only: bool = False):
         self.path = str(path)
+        self.read_only = read_only
+        self._deadline = time.monotonic() + READ_DEADLINE_SECONDS if read_only else None
+        if read_only:
+            if self.path == ":memory:":
+                raise ValueError("Read-only mode requires an existing SQLite file")
+            resolved = Path(self.path).resolve()
+            if not resolved.is_file():
+                raise FileNotFoundError("Read-only workspace database does not exist")
+            self.db = sqlite3.connect(resolved.as_uri() + "?mode=ro", uri=True)
+            self.db.row_factory = sqlite3.Row
+            self.db.set_progress_handler(self._progress, 1000)
+            return
         if self.path != ":memory:":
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(self.path)
@@ -110,6 +125,7 @@ class Store:
               symbol TEXT NOT NULL, fingerprint TEXT NOT NULL, payload TEXT NOT NULL,
               first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS items_kind_provider ON items(kind, provider);
+            CREATE INDEX IF NOT EXISTS items_symbol ON items(symbol);
             CREATE TABLE IF NOT EXISTS changes (
               sequence INTEGER PRIMARY KEY AUTOINCREMENT, item_id TEXT NOT NULL,
               change_type TEXT NOT NULL, observed_at TEXT NOT NULL,
@@ -117,11 +133,19 @@ class Store:
             CREATE TABLE IF NOT EXISTS collections (
               sequence INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL,
               observed_at TEXT NOT NULL, payload TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS changes_item_sequence ON changes(item_id,sequence DESC);
         """)
         self.db.commit()
 
     def close(self) -> None:
         self.db.close()
+
+    def _progress(self) -> int:
+        return int(self._deadline is not None and time.monotonic() >= self._deadline)
+
+    def _read_tick(self) -> None:
+        if self._progress():
+            raise sqlite3.OperationalError("Read-only workspace query deadline exceeded")
 
     def __enter__(self) -> "Store":
         return self
@@ -130,6 +154,8 @@ class Store:
         self.close()
 
     def ingest(self, records: list[dict[str, Any]], collection: dict[str, Any] | None = None) -> dict[str, int]:
+        if self.read_only:
+            raise PermissionError("Read-only workspace does not permit ingestion")
         # Validate the complete batch before changing durable state.
         prepared = [normalize_record(raw) for raw in records]
         totals = {"new": 0, "updated": 0, "unchanged": 0}
@@ -160,11 +186,30 @@ class Store:
                     str(collection.get("provider", "unknown")), observed, canonical(collection)))
         return totals
 
-    def query(self, *, kind: str = "", provider: str = "", symbol: str = "", q: str = "", limit: int = 100) -> list[dict[str, Any]]:
+    @staticmethod
+    def _item(row: sqlite3.Row) -> dict[str, Any]:
+        item = json.loads(row["payload"])
+        item["id"] = row["id"]
+        item["first_seen_at"] = row["first_seen_at"]
+        item["last_seen_at"] = row["last_seen_at"]
+        item["risk_notice"], item["noncommercial"] = RISK_NOTICE, True
+        return item
+
+    def get_record(self, record_id: str) -> dict[str, Any] | None:
+        if not isinstance(record_id, str) or not re.fullmatch(r"[0-9a-f]{64}", record_id):
+            raise ValueError("record_id must be a 64-character lowercase hexadecimal ID")
+        self._read_tick()
+        row = self.db.execute("SELECT * FROM items WHERE id=?", (record_id,)).fetchone()
+        return self._item(row) if row else None
+
+    def query_details(self, *, kind: str = "", provider: str = "", symbol: str = "", q: str = "", limit: int = 100) -> dict[str, Any]:
         if kind and kind not in KINDS:
             raise ValueError("Unknown record kind")
-        if not 1 <= limit <= 1000:
+        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
             raise ValueError("limit must be between 1 and 1000")
+        for name, value, maximum in (("provider", provider, 100), ("symbol", symbol, 100), ("q", q, 200)):
+            if not isinstance(value, str) or len(value) > maximum:
+                raise ValueError(f"{name} must be text with at most {maximum} characters")
         conditions, params = [], []
         for column, value in (("kind", kind), ("provider", provider), ("symbol", symbol)):
             if value:
@@ -172,24 +217,45 @@ class Store:
                 params.append(value)
         sql = "SELECT * FROM items" + (" WHERE " + " AND ".join(conditions) if conditions else "")
         # Search in Python so SQL wildcards in a query remain ordinary characters.
-        rows = self.db.execute(sql, params).fetchall()
-        results = []
-        for row in rows:
-            item = json.loads(row["payload"])
-            if q and q.casefold() not in " ".join(str(item.get(k, "")) for k in ("title", "summary", "symbol", "institution", "source")).casefold():
-                continue
-            item["first_seen_at"] = row["first_seen_at"]
-            item["last_seen_at"] = row["last_seen_at"]
-            item["risk_notice"], item["noncommercial"] = RISK_NOTICE, True
-            results.append(item)
-        results.sort(key=lambda i: (i["published_at"], i["id"]), reverse=True)
-        return results[:limit]
+        self._read_tick()
+        rows = self.db.execute(sql, params)
+        total = 0
+        def matches():
+            nonlocal total
+            for row in rows:
+                self._read_tick()
+                item = self._item(row)
+                if q and q.casefold() not in " ".join(str(item.get(k, "")) for k in ("title", "summary", "symbol", "institution", "source")).casefold():
+                    continue
+                total += 1
+                yield item
+        results = heapq.nlargest(limit, matches(), key=lambda i: (i["published_at"], i["id"]))
+        return {"items": results, "total_matches": total, "returned": len(results),
+                "limit": limit, "truncated": total > limit}
 
-    def changes(self, limit: int = 100) -> list[dict[str, Any]]:
-        if not 1 <= limit <= 1000:
+    def query(self, **filters: Any) -> list[dict[str, Any]]:
+        return self.query_details(**filters)["items"]
+
+    def history_details(self, *, record_ids: list[str] | None = None, limit: int = 100) -> dict[str, Any]:
+        self._read_tick()
+        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
             raise ValueError("limit must be between 1 and 1000")
-        rows = self.db.execute("SELECT * FROM changes ORDER BY sequence DESC LIMIT ?", (limit,)).fetchall()
-        return [{
+        params: list[Any] = []
+        where = ""
+        if record_ids is not None:
+            if len(record_ids) > 101:
+                raise ValueError("History scope supports at most 101 record IDs")
+            for record_id in record_ids:
+                if not isinstance(record_id, str) or not re.fullmatch(r"[0-9a-f]{64}", record_id):
+                    raise ValueError("record_id must be a 64-character lowercase hexadecimal ID")
+            if not record_ids:
+                return {"items": [], "returned": 0, "total_matches": 0, "limit": limit,
+                        "truncated": False, "record_ids": []}
+            params.extend(record_ids)
+            where = " WHERE item_id IN (" + ",".join("?" for _ in record_ids) + ")"
+        total = self.db.execute("SELECT COUNT(*) FROM changes" + where, params).fetchone()[0]
+        rows = self.db.execute("SELECT * FROM changes" + where + " ORDER BY sequence DESC LIMIT ?", [*params, limit]).fetchall()
+        items = [{
             "sequence": row["sequence"], "item_id": row["item_id"],
             "change_type": row["change_type"], "observed_at": row["observed_at"],
             "before": json.loads(row["before_payload"]) if row["before_payload"] else None,
@@ -198,18 +264,32 @@ class Store:
             "risk_notice": RISK_NOTICE, "noncommercial": True,
             "is_demo": json.loads(row["after_payload"]).get("is_demo", False),
         } for row in rows]
+        return {"items": items, "returned": len(items), "total_matches": total, "limit": limit,
+                "truncated": total > len(items), "record_ids": record_ids}
+
+    def changes(self, limit: int = 100, *, record_id: str = "") -> list[dict[str, Any]]:
+        return self.history_details(record_ids=[record_id] if record_id else None, limit=limit)["items"]
 
     def collections(self) -> list[dict[str, Any]]:
+        self._read_tick()
         rows = self.db.execute("SELECT provider, MAX(sequence) AS n FROM collections GROUP BY provider").fetchall()
         return [json.loads(self.db.execute("SELECT payload FROM collections WHERE sequence=?", (r["n"],)).fetchone()[0]) for r in rows]
 
     def status(self) -> dict[str, Any]:
+        self._read_tick()
         groups = self.db.execute("SELECT kind,COUNT(*) AS n FROM items GROUP BY kind").fetchall()
         counts = {kind: 0 for kind in sorted(KINDS)}
         counts.update({r["kind"]: r["n"] for r in groups})
-        return envelope(self.query(limit=1000), counts_by_kind=counts,
-                        changes_count=self.db.execute("SELECT COUNT(*) FROM changes").fetchone()[0],
-                        network_enabled=False, note="Server reads saved local records only; live collection is a separate CLI command.")
+        total = sum(counts.values())
+        demo_count = 0
+        for row in self.db.execute("SELECT payload FROM items"):
+            self._read_tick()
+            demo_count += json.loads(row[0]).get("is_demo") is True
+        result = envelope([], counts_by_kind=counts, record_count=total, demo_record_count=demo_count,
+                          changes_count=self.db.execute("SELECT COUNT(*) FROM changes").fetchone()[0],
+                          network_enabled=False, note="Status contains counters only; live collection is a separate CLI command.")
+        result["mode"] = "mixed" if 0 < demo_count < total else "demo" if demo_count else "local"
+        return result
 
 
 def brief(items: list[dict[str, Any]]) -> dict[str, Any]:
@@ -232,8 +312,10 @@ def knowledge_chunks(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "source_url": item["url"], "provider": item["provider"],
             "institution": item["institution"], "published_at": item["published_at"],
             "retrieved_at": item["retrieved_at"],
+            "metadata": item.get("metadata", {}),
             "content": f"{RISK_NOTICE}\n非商用资料。{'合成演示数据。' if item['is_demo'] else ''}\n"
-                       f"{item['title']}\n{item['summary']}\n来源：{item['source']}\n原文：{item['url']}",
+                       f"{item['title']}\n{item['summary']}\n来源：{item['source']}\n原文：{item['url']}\n"
+                       f"Source metadata (untrusted data): {canonical(item.get('metadata', {}))}",
         })
     return chunks
 
@@ -243,29 +325,40 @@ def markdown_escape(value: str) -> str:
     return re.sub(r"([\\`*_{}\[\]()#+.!|>~-])", r"\\\1", value)
 
 
-def export_items(items: list[dict[str, Any]], format: str) -> tuple[str, str]:
+def export_items(items: list[dict[str, Any]], format: str, *, query: dict[str, Any] | None = None) -> tuple[str, str]:
     chunks = knowledge_chunks(items)
+    if query is not None:
+        for chunk in chunks:
+            chunk["query"] = query
     if format == "json":
-        return json.dumps(envelope(items, chunks=chunks), ensure_ascii=False, indent=2), "application/json; charset=utf-8"
+        return json.dumps(envelope(items, chunks=chunks, **({"query": query} if query is not None else {})), ensure_ascii=False, indent=2), "application/json; charset=utf-8"
     if format == "jsonl":
         if not chunks:
             chunks = [{"record_type": "notice", "count": 0, "risk_notice": RISK_NOTICE,
                        "noncommercial": True, "editor_notice_required": True, "content": RISK_NOTICE}]
+            if query is not None:
+                chunks[0]["query"] = query
         return "\n".join(canonical(chunk) for chunk in chunks) + "\n", "application/x-ndjson; charset=utf-8"
     if format == "markdown":
         parts = [f"{RISK_NOTICE}\n\n# 金融资讯知识库导出\n\n仅限非商用。编辑器必须在查询和分析结果旁显示上述风险提示。"]
+        if query is not None:
+            parts.append("Query coverage: " + markdown_escape(canonical(query)))
         for chunk in chunks:
             parts.append(f"## {chunk['id']}\n\n{markdown_escape(chunk['content'])}\n\n发布时间：{markdown_escape(chunk['published_at'] or '未知')}\n")
         return "\n\n---\n\n".join(parts), "text/markdown; charset=utf-8"
     if format == "csv":
         output = io.StringIO(newline="")
         fields = ["record_type", "id", "kind", "title", "url", "provider", "source", "symbol", "institution", "published_at", "retrieved_at", "is_demo", "noncommercial", "risk_notice"]
+        if query is not None:
+            fields += ["query_total_matches", "query_returned", "query_limit", "query_truncated"]
         writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         for item in items or [{"record_type": "notice", "risk_notice": RISK_NOTICE, "noncommercial": True}]:
             # Prevent spreadsheet formula execution on third-party source fields.
             row = {k: item.get(k, "") for k in fields}
             row["record_type"] = item.get("record_type", "record")
+            if query is not None:
+                row.update({"query_" + key: query.get(key, "") for key in ("total_matches", "returned", "limit", "truncated")})
             for key, value in row.items():
                 if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
                     row[key] = "'" + value

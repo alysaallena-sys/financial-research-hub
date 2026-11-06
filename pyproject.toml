@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "financial-research-hub"
-version = "0.1.0"
+version = "0.2.0"
 description = "Noncommercial financial information, research metadata and rating-change workspace."
 requires-python = ">=3.11"
 license = "LicenseRef-Financial-Research-Hub-NC-1.0"
@@ -14,9 +14,11 @@ dependencies = []
 
 [project.optional-dependencies]
 ratings = ["yfinance>=1.8,<2"]
+mcp = ["mcp==2.3.0"]
 
 [project.scripts]
 financial-research-hub = "finance_research_hub.cli:main"
+financial-research-hub-mcp = "finance_research_hub.mcp_server:main"
 
 [tool.setuptools.packages.find]
 include = ["finance_research_hub*"]

@@ -33,6 +33,20 @@ The page preview shows synthetic data in actual Safari: [workbench screenshot](i
 
 First complete publication: [fa442465786a6c2e8ec200f41059a92dd8e6d6ca](https://github.com/alysaallena-sys/financial-research-hub/commit/fa442465786a6c2e8ec200f41059a92dd8e6d6ca). The corresponding [Offline tests run 42245387434](https://github.com/alysaallena-sys/financial-research-hub/actions/runs/42245387434) was read back as success, with both Python versions successful. This receipt refers to a fixed version. Results for later commits must come from their corresponding Actions run records.
 
+## MCP extension acceptance on 2026-11-06
+
+The MCP-specific local unittest run passed two cases using the actual official SDK `mcp==2.3.0` and child stdio servers. The client negotiated `2026-07-28` with `mode="auto"` and `2025-11-25` with `mode="legacy"`.
+
+The run checked notices in structured and model-readable text, handled wrong-type, unknown-tool and invalid-limit errors, and found the chosen database's SHA-256 unchanged before and after the protocol checks. A missing database was refused without creating it or writing startup text to stdout. These are local SDK-client results; they do not establish arbitrary host compatibility or visible notices in an external editor.
+
+The complete extension suite passed all **58 tests** with the optional SDK installed: `python -B -m unittest discover -s tests -v`. The 17 shared-service checks cover exact lookup beyond a 1,000-record result window, scoped history, literal-topic selection across symbols, streaming top-N queries, read deadlines, read-only SQLite, CLI/HTTP parity and export notices. The base interpreter without the optional SDK passed 56 cases and explicitly skipped the two MCP cases.
+
+The [standalone acceptance helper](../integrations/mcp_client_acceptance.py) also passed both actual stdio paths. It observed the exact two owned child processes exit with return code 0 and found the synthetic database SHA-256 unchanged. Process observation uses private instrumentation against the exact pinned SDK; it is not a portable host API.
+
+The linked-research page was checked in actual Safari with observed CSS viewports of 1440×896 and 834×904. An exact-symbol synthetic report opened its source and scoped history. Switching to the literal topic `示例` returned all four synthetic information types. The page kept the risk bar visible, avoided horizontal overflow and gave the new visible action/form controls at least 44px height. This is a desktop Safari viewport check; a physical iPad and browser file-download acceptance remain unverified.
+
+Remote CI for each extension commit and external-editor display have separate acceptance scopes. The earlier 39-test and publication receipts above refer to the earlier fixed version. Do not promote those receipts into validation of every later change. See the [MCP guide](MCP.md) and [coverage matrix](COVERAGE.md).
+
 ## Completed independent offline contract checks
 
 Command:

@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from . import RISK_NOTICE
-from .core import Store, brief, demo_records, envelope, export_items
+from .core import Store, demo_records, envelope
+from .service import ResearchWorkspace
 from .providers import (FEEDS, ProviderError, collect_eastmoney, collect_feed, collect_yahoo,
                         curl_request_bytes, request_bytes, source_catalog)
 
@@ -34,7 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = Parser(description="Noncommercial financial metadata workspace", epilog=RISK_NOTICE)
     parser.add_argument("--db", default=DEFAULT_DB, help="Local SQLite state (never publish this file)")
     sub = parser.add_subparsers(dest="command", required=True, parser_class=Parser)
-    for name in ("demo", "query", "brief", "export", "sources", "changes", "collect", "serve"):
+    for name in ("demo", "query", "record", "pack", "brief", "export", "sources", "changes", "collect", "serve"):
         cmd = sub.add_parser(name, epilog=RISK_NOTICE)
         cmd.add_argument("--db", default=argparse.SUPPRESS, help="Also accepted after the command")
         if name in {"query", "brief", "export"}:
@@ -44,6 +45,16 @@ def build_parser() -> argparse.ArgumentParser:
             cmd.add_argument("--output", help="Create a new export file; existing paths are not overwritten")
         if name == "changes":
             cmd.add_argument("--limit", type=int, default=100)
+            cmd.add_argument("--record-id", default="", help="Scope history to one exact record ID")
+        if name == "record":
+            cmd.add_argument("record_id", help="Exact 64-character record ID")
+            cmd.add_argument("--history-limit", type=int, default=50)
+        if name == "pack":
+            cmd.add_argument("--record-id", default="", help="Optional exact anchor record ID")
+            cmd.add_argument("--symbol", default="", help="Exact saved symbol; no automatic entity inference")
+            cmd.add_argument("--q", default="", help="Literal metadata text, not semantic similarity")
+            cmd.add_argument("--limit", type=int, default=100, help="At most 100 selected records")
+            cmd.add_argument("--history-limit", type=int, default=20)
         if name == "collect":
             cmd.add_argument("--source", required=True, choices=[*FEEDS, "eastmoney", "yahoo"])
             cmd.add_argument("--live", action="store_true", help="Explicitly permit a bounded public metadata request")
@@ -98,28 +109,38 @@ def main(argv: list[str] | None = None) -> int:
             serve(args.db, args.port, args.host)
             return 0
         with Store(args.db) as store:
+            workspace = ResearchWorkspace(args.db, store=store)
             if args.command == "demo":
                 delta = store.ingest(demo_records())
                 _print(envelope(store.query(), changes=delta, note="All demo records are synthetic; no live source was called."))
             elif args.command == "sources":
-                _print(envelope([], sources=source_catalog(store.collections()), collections=store.collections()))
+                _print(workspace.sources())
             elif args.command == "changes":
-                _print(envelope(store.changes(args.limit)))
+                _print(workspace.changes(record_id=args.record_id, limit=args.limit))
+            elif args.command == "record":
+                result = workspace.get_record(args.record_id, history_limit=args.history_limit)
+                _print(result)
+                return 0 if result["found"] else 1
+            elif args.command == "pack":
+                result = workspace.research_pack(record_id=args.record_id, symbol=args.symbol, q=args.q,
+                                                 limit=args.limit, history_limit=args.history_limit)
+                _print(result)
+                return 1 if result.get("missing_reason") else 0
             else:
                 filters = {key: getattr(args, key) for key in ("kind", "provider", "symbol", "q", "limit")}
-                items = store.query(**filters)
                 if args.command == "query":
-                    _print(envelope(items, limit=args.limit, returned=len(items)))
+                    _print(workspace.search(**filters))
                 elif args.command == "brief":
-                    print(brief(items)["text"])
+                    print(workspace.brief(**filters)["text"])
                 else:
-                    text, _ = export_items(items, args.format)
+                    result = workspace.export(args.format, **filters)
+                    text = result["content"]
                     if args.output:
                         output = Path(args.output)
                         output.parent.mkdir(parents=True, exist_ok=True)
                         with output.open("x", encoding="utf-8", newline="") as handle:
                             handle.write(text)
-                        _print(envelope([], output=str(output), exported_records=len(items), format=args.format))
+                        _print(envelope([], output=str(output), exported_records=result["count"], format=args.format, query=result["query"]))
                     else:
                         print(text, end="" if text.endswith("\n") else "\n")
         return 0
