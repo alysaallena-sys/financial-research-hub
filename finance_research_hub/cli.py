@@ -11,6 +11,7 @@ from typing import Any
 from . import RISK_NOTICE
 from .core import Store, demo_records, envelope
 from .service import ResearchWorkspace
+from .evidence import DATASET_KINDS, MAX_IMPORT_BYTES, demo_datasets
 from .providers import (FEEDS, ProviderError, collect_eastmoney, collect_feed, collect_yahoo,
                         curl_request_bytes, request_bytes, source_catalog)
 
@@ -35,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = Parser(description="Noncommercial financial metadata workspace", epilog=RISK_NOTICE)
     parser.add_argument("--db", default=DEFAULT_DB, help="Local SQLite state (never publish this file)")
     sub = parser.add_subparsers(dest="command", required=True, parser_class=Parser)
-    for name in ("demo", "query", "record", "pack", "brief", "export", "sources", "changes", "collect", "serve"):
+    for name in ("demo", "query", "record", "pack", "review-packet", "datasets", "dataset", "import-dataset", "import-records", "compare", "brief", "export", "sources", "changes", "collect", "serve"):
         cmd = sub.add_parser(name, epilog=RISK_NOTICE)
         cmd.add_argument("--db", default=argparse.SUPPRESS, help="Also accepted after the command")
         if name in {"query", "brief", "export"}:
@@ -49,6 +50,27 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "record":
             cmd.add_argument("record_id", help="Exact 64-character record ID")
             cmd.add_argument("--history-limit", type=int, default=50)
+        if name == "datasets":
+            cmd.add_argument("--kind", choices=sorted(DATASET_KINDS), default="")
+            cmd.add_argument("--symbol", default="")
+            cmd.add_argument("--q", default="", help="Literal title, symbol, topic or provenance text")
+            cmd.add_argument("--limit", type=int, default=100)
+        if name == "dataset":
+            cmd.add_argument("dataset_id", help="Exact saved dataset ID")
+        if name in {"import-dataset", "import-records"}:
+            cmd.add_argument("file", help="Explicit local JSON file; no URL, database scan or source collection")
+        if name == "compare":
+            cmd.add_argument("dataset_ids", nargs="+", help="Between 2 and 5 exact saved dataset IDs")
+            cmd.add_argument("--alignment", choices=["strict", "intersection"], default="strict")
+            cmd.add_argument("--start", default="")
+            cmd.add_argument("--end", default="")
+        if name == "review-packet":
+            cmd.add_argument("--record-id", default="")
+            cmd.add_argument("--symbol", default="")
+            cmd.add_argument("--q", default="")
+            cmd.add_argument("--dataset-id", action="append", default=[])
+            cmd.add_argument("--question", default="")
+            cmd.add_argument("--limit", type=int, default=20)
         if name == "pack":
             cmd.add_argument("--record-id", default="", help="Optional exact anchor record ID")
             cmd.add_argument("--symbol", default="", help="Exact saved symbol; no automatic entity inference")
@@ -105,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
             with Store(args.db) as store:
                 if args.demo:
                     store.ingest(demo_records())
+                    for dataset in demo_datasets():
+                        store.import_dataset(dataset)
             from .server import serve
             serve(args.db, args.port, args.host)
             return 0
@@ -112,7 +136,10 @@ def main(argv: list[str] | None = None) -> int:
             workspace = ResearchWorkspace(args.db, store=store)
             if args.command == "demo":
                 delta = store.ingest(demo_records())
-                _print(envelope(store.query(), changes=delta, note="All demo records are synthetic; no live source was called."))
+                datasets = [store.import_dataset(dataset) for dataset in demo_datasets()]
+                _print(envelope(store.query(), changes=delta, datasets_seeded=len(datasets),
+                                dataset_ids=[item["dataset"]["id"] for item in datasets],
+                                note="All demo records and numeric datasets are synthetic; no live source was called."))
             elif args.command == "sources":
                 _print(workspace.sources())
             elif args.command == "changes":
@@ -126,6 +153,34 @@ def main(argv: list[str] | None = None) -> int:
                                                  limit=args.limit, history_limit=args.history_limit)
                 _print(result)
                 return 1 if result.get("missing_reason") else 0
+            elif args.command == "datasets":
+                _print(workspace.datasets(kind=args.kind, symbol=args.symbol, q=args.q, limit=args.limit))
+            elif args.command == "dataset":
+                result = workspace.get_dataset(args.dataset_id)
+                _print(result)
+                return 0 if result["found"] else 1
+            elif args.command in {"import-dataset", "import-records"}:
+                with Path(args.file).open("rb") as handle:
+                    content = handle.read(MAX_IMPORT_BYTES + 1)
+                if len(content) > MAX_IMPORT_BYTES:
+                    raise ValueError("Local JSON import exceeds 2 MiB")
+                document = json.loads(content.decode("utf-8-sig"))
+                if args.command == "import-dataset":
+                    _print(workspace.import_dataset(document))
+                else:
+                    records = document.get("items") if isinstance(document, dict) else document
+                    if not isinstance(records, list) or len(records) > 1000 or any(not isinstance(row, dict) for row in records):
+                        raise ValueError("Record import requires an items envelope or array of at most 1000 record objects")
+                    # Import time is not evidence of original retrieval time.
+                    records = [{**row, "retrieved_at": row.get("retrieved_at") or "unknown"} for row in records]
+                    delta = store.ingest(records)
+                    _print(envelope([], imported_records=len(records), changes=delta,
+                                    note="Explicit local record import. Publication times and original identities are preserved; absent retrieval times remain unknown. No collection or legacy database scan occurred."))
+            elif args.command == "compare":
+                _print(workspace.compare(args.dataset_ids, alignment=args.alignment, start=args.start, end=args.end))
+            elif args.command == "review-packet":
+                _print(workspace.review_packet(record_id=args.record_id, symbol=args.symbol, q=args.q,
+                                               dataset_ids=args.dataset_id, question=args.question, limit=args.limit))
             else:
                 filters = {key: getattr(args, key) for key in ("kind", "provider", "symbol", "q", "limit")}
                 if args.command == "query":
@@ -144,7 +199,7 @@ def main(argv: list[str] | None = None) -> int:
                     else:
                         print(text, end="" if text.endswith("\n") else "\n")
         return 0
-    except (ValueError, ProviderError, OSError, sqlite3.Error) as exc:
+    except (ValueError, TypeError, RecursionError, LookupError, ProviderError, OSError, sqlite3.Error) as exc:
         print(json.dumps(envelope([], error=str(exc)), ensure_ascii=False), file=sys.stderr)
         return 2
 

@@ -24,9 +24,10 @@
         <button class="nav-item" type="button" data-kind="research"><span class="nav-icon" aria-hidden="true">▧</span>券商研报<span class="nav-key">03</span></button>
         <button class="nav-item" type="button" data-kind="rating"><span class="nav-icon" aria-hidden="true">↗</span>评级变化<span class="nav-key">04</span></button>
         <button class="nav-item" type="button" data-kind="talk"><span class="nav-icon" aria-hidden="true">▷</span>TED 与演讲<span class="nav-key">05</span></button>
+        <button class="nav-item" type="button" id="data-navigation"><span class="nav-icon" aria-hidden="true">⌁</span>数据与图表<span class="nav-key">06</span></button>
       </nav>
       <div class="sidebar-note"><span class="small-dot" aria-hidden="true"></span>本地资料库<span>查询、筛选与导出均读取本地记录。</span></div>
-      <div class="sidebar-bottom"><span class="license-badge">NONCOMMERCIAL</span><p>仅供非商用研究与学习。<br>保留来源，核对原文。</p><span class="sidebar-version">Financial Research Hub · 0.2.0</span></div>
+      <div class="sidebar-bottom"><span class="license-badge">NONCOMMERCIAL</span><p>仅供非商用研究与学习。<br>保留来源，核对原文。</p><span class="sidebar-version">Financial Research Hub · 0.3.0</span></div>
     </aside>
 
     <div class="workspace">
@@ -39,11 +40,34 @@
         <div class="demo-banner" id="demo-banner" hidden><strong>合成演示数据</strong><span>当前内容用于演示工作流程，不代表真实新闻、机构观点或行情。</span></div>
         <div class="page-heading"><div><div class="eyebrow">RESEARCH WORKSPACE</div><h1 id="page-title">研究总览</h1><p id="page-description">查看公开资讯、研报目录与评级记录，沿来源继续研究。</p></div><div class="heading-actions"><span id="last-read" class="muted">正在读取本地记录</span><button type="button" class="button button-secondary" id="refresh-button"><span aria-hidden="true">↻</span>刷新本地库</button></div></div>
 
-        <section class="metrics" aria-label="本次查询统计">
+        <section class="metrics" id="record-metrics" aria-label="本次查询统计">
           <div class="metric"><span>返回记录</span><strong id="metric-total">—</strong><small id="metric-scope">等待查询结果</small></div>
           <div class="metric"><span>研报目录</span><strong id="metric-research">—</strong><small>标题、机构与原文链接</small></div>
           <div class="metric"><span>评级事件</span><strong id="metric-rating">—</strong><small>以数据源返回记录为准</small></div>
           <div class="metric"><span>本地变更</span><strong id="metric-changes">—</strong><small>已记录的新增与更新</small></div>
+        </section>
+
+        <section id="data-workspace" aria-labelledby="data-heading" hidden>
+          <div class="panel data-catalog">
+            <div class="panel-heading"><div><div class="eyebrow">DATA WORKSPACE</div><h2 id="data-heading" tabindex="-1">数据与图表</h2><p>浏览已保存的价格、基金净值、债券资料与宏观序列。</p></div><span class="count-badge" id="dataset-count">— 组</span></div>
+            <form id="dataset-search-form" class="dataset-filters"><div class="field"><label for="dataset-kind-filter">数据类型</label><select id="dataset-kind-filter"><option value="">全部类型</option><option value="price_series">价格序列</option><option value="fund_nav">基金净值</option><option value="bond_profile">债券资料</option><option value="macro_series">宏观序列</option></select></div><div class="field"><label for="dataset-query-filter">标的或主题</label><input id="dataset-query-filter" type="search" placeholder="搜索本地数据集" autocomplete="off"></div><button class="button button-secondary" type="submit">查询数据集</button></form>
+            <p class="data-risk">投资有风险，分析结果和查询结果不构成投资建议。</p>
+            <p class="data-local-note">页面只读取本地证据。合成数据独立标记，缺失值保持缺失。</p>
+            <div id="dataset-status" class="dataset-status" role="status" aria-live="polite">正在读取数据目录…</div>
+            <ul id="dataset-list" class="dataset-list"></ul>
+          </div>
+
+          <section class="panel dataset-detail" id="dataset-detail" aria-labelledby="dataset-detail-heading" hidden>
+            <div class="panel-heading"><div><div class="eyebrow">SELECTED DATASET</div><h2 id="dataset-detail-heading" tabindex="-1">数据详情</h2><p id="dataset-detail-subtitle"></p></div><div class="dataset-detail-actions"><button class="text-button" id="dataset-research-button" type="button">关联研究资料 ↗</button><button class="text-button" id="dataset-export-button" type="button">导出数据 JSON ↗</button><button class="text-button" id="dataset-review-button" type="button">导出复核材料 ↗</button></div></div>
+            <p class="data-risk">投资有风险，分析结果和查询结果不构成投资建议。</p>
+            <div class="dataset-detail-body"><div id="dataset-detail-notice" class="data-callout"></div><p class="data-local-note review-local-note">复核材料只整理本地证据，尚未执行双模型复核；需要在你明确选择的本地执行环境中运行。</p><div class="dataset-provenance-grid"><dl class="metadata-grid" id="dataset-provenance"></dl><div id="dataset-coverage" class="dataset-coverage"></div></div><div id="dataset-chart" class="native-chart"></div><details class="data-table-details" open><summary>查看原始数值与缺失状态</summary><div class="data-table-scroll" tabindex="0" role="region" aria-label="数据数值表"><table id="dataset-table" class="data-table"></table></div></details></div>
+          </section>
+
+          <section class="panel comparison-panel" aria-labelledby="comparison-heading">
+            <div class="panel-heading"><div><div class="eyebrow">DETERMINISTIC COMPARISON</div><h2 id="comparison-heading">序列比较</h2><p>在数据目录中勾选最多 5 组价格或基金净值序列。</p></div><span class="count-badge" id="comparison-selection-count">已选 0 / 5</span></div>
+            <div class="review-handoff comparison-review"><button class="text-button" id="comparison-review-button" type="button" disabled>导出已选复核材料 ↗</button><p>只整理已选数据集，尚未执行双模型复核。材料不会发送到外部 AI。</p></div>
+            <div class="comparison-body"><div id="comparison-selected" class="comparison-selected"></div><form id="comparison-form" class="comparison-form"><div class="field"><label for="comparison-alignment">日期对齐</label><select id="comparison-alignment"><option value="strict">日期完全一致</option><option value="intersection">共同日期（排除其余）</option></select></div><div class="field"><label for="comparison-start">开始日期（可选）</label><input id="comparison-start" type="date"></div><div class="field"><label for="comparison-end">结束日期（可选）</label><input id="comparison-end" type="date"></div><button class="button" type="submit" id="comparison-button">比较已选序列</button></form><p class="data-local-note">由本地代码按明确日期与口径计算，不调用模型。共同日期模式会排除其余日期，不换汇、不填值；货币和复权等条件由服务校验。</p><div id="comparison-status" class="dataset-status" role="status" aria-live="polite">先选择需要比较的数据集。</div><div id="comparison-result" hidden><p class="data-risk">投资有风险，分析结果和查询结果不构成投资建议。</p><div id="comparison-coverage" class="data-callout"></div><div id="comparison-chart" class="native-chart"></div><div class="data-table-scroll" tabindex="0" role="region" aria-label="序列比较指标"><table id="comparison-metrics" class="data-table"></table></div><details class="data-table-details"><summary>查看对齐后的比较数值</summary><div class="data-table-scroll" tabindex="0" role="region" aria-label="对齐后的序列数值"><table id="comparison-table" class="data-table"></table></div></details></div></div>
+          </section>
         </section>
 
         <section class="panel research-pack" id="research-pack" aria-labelledby="pack-heading" hidden>
@@ -62,15 +86,16 @@
             <div id="pack-content" hidden>
               <div class="pack-toolbar"><div><strong id="pack-count">0 条资料</strong><span id="pack-match-note"></span></div><div class="export-actions"><label for="pack-export-format" class="sr-only">资料包导出格式</label><select id="pack-export-format"><option value="json">JSON 资料包</option><option value="markdown">Markdown 资料摘要</option></select><button type="button" class="text-button" id="pack-export">导出资料包 <span aria-hidden="true">↗</span></button></div></div>
               <div class="pack-grid">
-                <div class="pack-materials"><h3>本地相关资料</h3><p class="pack-section-note">按明确标识或关键词匹配。关联记录不代表相互印证。</p><ol id="pack-items" class="pack-items"></ol><details class="pack-brief"><summary>查看资料摘要</summary><pre id="pack-brief-text" class="brief-text"></pre><p class="compact-risk">投资有风险，分析结果和查询结果不构成投资建议。</p></details></div>
-                <div class="pack-context"><section><h3>选中记录的来源链</h3><dl id="pack-provenance" class="metadata-grid"></dl></section><section><h3>选中记录的更新历史</h3><ol id="pack-history" class="pack-history"></ol></section><section><h3>采集范围与缺口</h3><div id="pack-coverage" class="pack-coverage"></div></section></div>
+                <div class="pack-materials"><h3>本地相关资料</h3><p class="pack-section-note">按明确标识或关键词匹配。关联记录不代表相互印证。</p><ol id="pack-items" class="pack-items"></ol><section class="pack-datasets-section" id="pack-datasets-section" hidden><h3>关联数据与图表</h3><p class="pack-section-note">按明确标的或关键词匹配的数据集。</p><ul id="pack-datasets" class="pack-datasets"></ul></section><details class="pack-brief"><summary>查看资料摘要</summary><pre id="pack-brief-text" class="brief-text"></pre><p class="compact-risk">投资有风险，分析结果和查询结果不构成投资建议。</p></details></div>
+                <div class="pack-context"><section><h3>选中记录的来源链</h3><dl id="pack-provenance" class="metadata-grid"></dl></section><section><h3>选中记录的更新历史</h3><ol id="pack-history" class="pack-history"></ol></section><section><h3>采集范围与缺口</h3><div id="pack-coverage" class="pack-coverage"></div></section><section id="pack-references-section" hidden><h3>研究参考入口</h3><p class="pack-section-note" id="pack-references-note">这些是注明核查日期的目录参考，不表示已采集正文或取得数据接口授权。</p><ul id="pack-references" class="sources-list"></ul></section></div>
               </div>
               <p class="pack-export-note">JSON 保留完整来源、历史、覆盖范围与检索片段；Markdown 导出条目与摘要。接收的编辑器或知识库必须在查询和分析结果中显示风险提示。</p>
+              <div class="review-handoff"><button class="text-button" id="pack-review-button" type="button">导出复核材料 ↗</button><p>只整理本地证据，尚未执行双模型复核。需要在你明确选择的本地执行环境中运行。</p></div>
             </div>
           </div>
         </section>
 
-        <div class="workspace-grid">
+        <div class="workspace-grid" id="record-workspace">
           <section class="panel results-panel" aria-labelledby="results-heading">
             <div class="panel-heading"><div><h2 id="results-heading" tabindex="-1">资讯与研报</h2><p>选择“关联研究”，汇集相关资料、来源与更新历史。</p></div><span id="result-count" class="count-badge">— 条</span></div>
             <form id="search-form" class="filter-form" role="search">
@@ -90,6 +115,7 @@
             <section class="panel brief-panel" aria-labelledby="brief-heading"><div class="panel-heading"><div><div class="eyebrow">LOCAL BRIEF</div><h2 id="brief-heading">本地简报</h2></div><button class="text-button" type="button" id="brief-button">生成 <span aria-hidden="true">↗</span></button></div><p class="panel-intro">汇总当前查询结果，最多 100 条。生成过程不调用模型。</p><div class="brief-placeholder" id="brief-placeholder">从当前查询整理信息分布与来源记录。</div><pre id="brief-text" class="brief-text" hidden></pre><p class="compact-risk">投资有风险，分析结果和查询结果不构成投资建议。</p></section>
             <section class="panel" aria-labelledby="changes-heading"><div class="panel-heading"><div><div class="eyebrow">CHANGE LOG</div><h2 id="changes-heading">新增与更新</h2></div><span class="count-badge" id="changes-count">—</span></div><ul id="changes-list" class="changes-list"><li class="context-empty">正在读取变更记录…</li></ul><p class="panel-footnote">首次观察时间与原始发表时间分别记录。</p></section>
             <section class="panel" aria-labelledby="sources-heading"><div class="panel-heading"><div><div class="eyebrow">PROVENANCE</div><h2 id="sources-heading">来源与覆盖</h2></div><span class="source-mark" aria-hidden="true">◎</span></div><ul id="sources-list" class="sources-list"><li class="context-empty">正在读取来源状态…</li></ul><p class="panel-footnote">目录中的来源不代表已采集。具体覆盖以本次采集记录为准。</p></section>
+            <section class="panel" aria-labelledby="research-catalog-heading"><div class="panel-heading"><div><div class="eyebrow">RESEARCH DIRECTORY</div><h2 id="research-catalog-heading">研究入口</h2></div><span class="source-mark" aria-hidden="true">↗</span></div><ul id="research-catalog-list" class="sources-list"><li class="context-empty">正在读取研究入口…</li></ul><p class="panel-footnote">链接仅供手动访问。目录不会自动采集、登录、嵌入或调用这些服务。</p></section>
           </aside>
         </div>
         <footer class="workspace-footer"><span>非商用 · 来源可追溯 · 本地优先</span><span>编辑器与知识库集成必须显示风险提示。</span></footer>

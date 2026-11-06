@@ -5,8 +5,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
+from . import RISK_NOTICE
 from .core import KINDS, Store, brief as build_brief, canonical, envelope, export_items, knowledge_chunks
 from .providers import source_catalog
+from .evidence import DATASET_KINDS, dataset_chunks, dataset_id, dataset_summary
 
 
 def _limit(value: int, name: str = "limit") -> int:
@@ -82,15 +84,53 @@ class ResearchWorkspace:
 
     def status(self) -> dict[str, Any]:
         with self._connection() as store:
-            return {**store.status(), "read_only": self.read_only,
-                    "service": "ResearchWorkspace", "capabilities": ["search", "record", "changes", "brief", "export", "research_pack"],
-                    "collection_available_through_service": False}
+            result = {**store.status(), **store.dataset_counts(), "read_only": self.read_only,
+                      "service": "ResearchWorkspace", "capabilities": ["search", "record", "changes", "brief", "export", "research_pack", "datasets", "dataset", "compare", "review_packet"],
+                      "collection_available_through_service": False}
+            total = result["record_count"] + result["dataset_count"]
+            demos = result["demo_record_count"] + result["demo_dataset_count"]
+            result["mode"] = "mixed" if 0 < demos < total else "demo" if demos else "local"
+            return result
 
     def sources(self) -> dict[str, Any]:
         with self._connection() as store:
             collections = store.collections()
+            try:
+                from .workflow import research_catalog
+                catalog = research_catalog()
+                catalog_available = True
+            except ModuleNotFoundError:
+                catalog, catalog_available = [], False
             return envelope([], sources=source_catalog(collections), collections=collections,
+                            research_catalog=catalog, research_catalog_available=catalog_available,
                             network_enabled=False, note="Adapter availability is not live-source acceptance.")
+
+    @staticmethod
+    def _references(q: str, *, limit: int = 20) -> dict[str, Any]:
+        note = "Dated catalogue metadata, not active acquisition, full text or runtime acceptance."
+        if not q:
+            return envelope([], empty=True, total_matches=0, returned=0, limit=limit, truncated=False,
+                            source_metadata_reference_only=True, query=q, note=note,
+                            selection_basis="explicit_literal_query_only; no query supplied")
+        try:
+            from .workflow import research_catalog
+            catalog = research_catalog()
+        except ModuleNotFoundError:
+            return envelope([], empty=True, total_matches=0, returned=0, limit=limit, truncated=False,
+                            source_metadata_reference_only=True, query=q, note=note, catalogue_available=False)
+        found = []
+        total = 0
+        for entry in catalog:
+            haystack = " ".join(str(entry.get(key, "")) for key in ("id", "name", "notes", "role")).casefold()
+            if q.casefold() not in haystack:
+                continue
+            total += 1
+            if len(found) < limit:
+                found.append({**entry, "risk_notice": RISK_NOTICE, "noncommercial": True,
+                              "is_demo": False, "source_metadata_reference_only": True})
+        return envelope(found, empty=not found, total_matches=total, returned=len(found), limit=limit,
+                        truncated=total > len(found), source_metadata_reference_only=True,
+                        query=q, note=note, catalogue_available=True, selection_basis="literal_catalogue_metadata")
 
     def search(self, *, kind: str = "", provider: str = "", symbol: str = "", q: str = "", limit: int = 100) -> dict[str, Any]:
         with self._connection() as store:
@@ -127,6 +167,76 @@ class ResearchWorkspace:
         content, content_type = export_items(result["items"], format, query=query)
         return {**result, "format": format, "content": content, "content_type": content_type,
                 "chunks": knowledge_chunks(result["items"]), "query": query}
+
+    @staticmethod
+    def _datasets(store: Store, *, kind: str = "", symbol: str = "", q: str = "", limit: int = 100,
+                  related_record_ids: list[str] | None = None) -> dict[str, Any]:
+        filters = {"kind": _text(kind, "kind", 32), "symbol": _text(symbol, "symbol", 100), "q": _text(q, "q", 200)}
+        details = store.dataset_details(**filters, limit=_limit(limit), related_record_ids=related_record_ids)
+        return envelope(details["items"], empty=not details["items"], filters=filters,
+                        **{key: value for key, value in details.items() if key != "items"},
+                        rows_scope="Directory summaries include at most 5 preview rows; use exact dataset retrieval for the saved rows.")
+
+    def datasets(self, *, kind: str = "", symbol: str = "", q: str = "", limit: int = 100) -> dict[str, Any]:
+        with self._connection() as store:
+            return self._datasets(store, kind=kind, symbol=symbol, q=q, limit=limit)
+
+    def get_dataset(self, identifier: str) -> dict[str, Any]:
+        dataset_id(identifier)
+        with self._connection() as store:
+            item = store.get_dataset(identifier)
+            return envelope([item] if item else [], found=item is not None, empty=item is None,
+                            dataset_id=identifier, dataset=item, schema_available=store.dataset_schema_available(),
+                            chunks=dataset_chunks(item) if item else [],
+                            related_selector={"symbol": item.get("symbol") or "", "q": ""} if item else {"symbol": "", "q": ""},
+                            missing_reason=None if item else "No saved local dataset has this exact ID; legacy databases may require explicit local import migration.")
+
+    def import_dataset(self, document: dict[str, Any]) -> dict[str, Any]:
+        if self.read_only:
+            raise PermissionError("Read-only service does not permit local dataset import")
+        with self._connection() as store:
+            result = store.import_dataset(document)
+            summary = dataset_summary(result["dataset"])
+            return envelope([summary], status=result["status"], dataset_id=summary["id"], dataset=summary,
+                            content_scope="Explicit local import only; no source network request or independent source verification.")
+
+    @staticmethod
+    def _dataset_ids(values: list[str]) -> list[str]:
+        if not isinstance(values, list) or not 1 <= len(values) <= 5:
+            raise ValueError("Select between 1 and 5 exact dataset IDs")
+        checked = [dataset_id(value) for value in values]
+        if len(set(checked)) != len(checked):
+            raise ValueError("Duplicate dataset IDs are not permitted")
+        return checked
+
+    def compare(self, dataset_ids: list[str], *, alignment: str = "strict", start: str = "", end: str = "") -> dict[str, Any]:
+        from .comparison import compare_datasets
+        identifiers = self._dataset_ids(dataset_ids)
+        if len(identifiers) < 2:
+            raise ValueError("Comparison requires between 2 and 5 exact datasets")
+        with self._connection() as store:
+            datasets = [store.get_dataset(identifier) for identifier in identifiers]
+        if any(item is None for item in datasets):
+            raise LookupError("One or more exact datasets were not found")
+        return compare_datasets(datasets, alignment=alignment, start=start, end=end)
+
+    def review_packet(self, *, record_id: str = "", symbol: str = "", q: str = "", dataset_ids: list[str] | None = None,
+                      question: str = "", limit: int = 20) -> dict[str, Any]:
+        from .workflow import build_review_packet
+        question = _text(question, "question", 1000)
+        if dataset_ids is not None and not isinstance(dataset_ids, list):
+            raise ValueError("dataset_ids must be a list of exact IDs")
+        identifiers = self._dataset_ids(dataset_ids) if dataset_ids else []
+        if not record_id and not symbol and not q and not identifiers:
+            raise ValueError("review_packet requires a record selector, literal query or exact datasets")
+        pack = self.research_pack(record_id=record_id, symbol=symbol, q=q, limit=limit) if record_id or symbol or q else envelope([], empty=True)
+        if pack.get("missing_reason"):
+            raise LookupError(pack["missing_reason"])
+        with self._connection() as store:
+            datasets = [store.get_dataset(identifier) for identifier in identifiers]
+        if any(item is None for item in datasets):
+            raise LookupError("One or more exact datasets were not found")
+        return build_review_packet(pack, datasets, question=question)
 
     def research_pack(self, *, record_id: str = "", symbol: str = "", q: str = "", limit: int = 100, history_limit: int = 20) -> dict[str, Any]:
         record_id = _text(record_id, "record_id", 64)
@@ -186,4 +296,18 @@ class ResearchWorkspace:
                 relationship="Exact-symbol and/or literal-text selection only; no causal relationship or independent corroboration is established.",
                 independent_corroboration="not_established", full_report_text_included=False,
             )
+            related = self._datasets(store, symbol=symbol, q=q, limit=20, related_record_ids=record_ids)
+            if result.get("missing_reason"):
+                related = envelope([], empty=True, schema_available=related["schema_available"], limit=20,
+                                   total_matches=0, returned=0, truncated=False)
+            result["related_datasets"] = related
+            references = self._references(q if not result.get("missing_reason") else "")
+            result["reference_entries"] = references
+            result["dataset_chunks"] = [chunk for item in related["items"] for chunk in dataset_chunks(item)]
+            result["missing_dataset_kinds"] = sorted(DATASET_KINDS - {item["kind"] for item in related["items"]})
+            result["coverage"]["datasets"] = {key: related[key] for key in ("returned", "total_matches", "limit", "truncated", "schema_available")}
+            result["evidence_counts"] = {"records": len(items), "datasets": related["count"], "references": references["count"]}
+            result["has_evidence"] = bool(items or related["items"] or references["items"])
+            if not result.get("missing_reason"):
+                result["found"], result["empty"] = result["has_evidence"], not result["has_evidence"]
             return result

@@ -6,7 +6,29 @@ Investing involves risk. Analysis and query results do not constitute investment
 
 This file separates source implementation, synthetic tests, local pages, third-party sources and public publication. A pass at one layer does not replace acceptance at another layer.
 
-## Local acceptance on 2026-11-06
+## Local version 0.3.0 acceptance on 2026-11-06
+
+The following results describe the unified metadata, dataset, comparison and local-review extension. The review used local acceptance receipts. Those receipts, databases and acquired observations remain private; this repository publishes no raw acquired sample data.
+
+| Layer | Observed result | Scope limit |
+| --- | --- | --- |
+| Complete synthetic suite | `python -B -m unittest discover -s tests -v` passed all **95 tests** with the optional official MCP SDK installed; no skips; return code 0 | Synthetic tests do not establish continuous source availability or data accuracy |
+| Wheel build and content audit | A local version 0.3.0 wheel built successfully. Its 22 members included the workspace policy, static resources, LICENSE and NOTICE, with all 35 catalog entries. The audit found no private/local members, databases, PDFs or private-path content | The wheel was not installed, and runtime dependencies were not installed by this build. Package-content acceptance does not establish installation or an external-host connection |
+| Actual MCP stdio | The standalone helper passed with `mcp==2.3.0` in `auto` (`2026-07-28`) and `legacy` (`2025-11-25`) modes; it checked eleven tools, four fixed resources, two exact-object templates and two prompts | This is SDK-client acceptance, not installation or visible notice acceptance in an arbitrary editor |
+| MCP policy and lifecycle | Text and structured notices, dataset fingerprints and row/chunk notices, comparisons, unexecuted review state and handled errors passed; each of the two exact owned children exited with return code 0; the synthetic database SHA-256 remained unchanged | The helper observes only its owned child objects through instrumentation against the pinned SDK; it performs no process scan or explicit kill |
+| Imported non-demo evidence through HTTP | Twelve actual loopback GET checks returned HTTP 200 over four saved dataset kinds: price series, fund NAV, bond profile and macro series. The database SHA-256 remained unchanged; the server reported read-only mode; no new source request occurred | This proves local import/readback and interface behavior, not a continuous provider adapter, complete history or independent verification of published values |
+| Missing source metadata | Readback retained declared units, missing-field flags and an unknown original macro retrieval timestamp as `null` | Import time or another source's timestamp must not replace missing evidence |
+| Actual Safari layout | Apple's official Safari MCP checked CSS viewports of 1440×896 and 834×904. Neither viewport had document overflow. Visible interactive targets, including checkbox labels and source links, met the 44px minimum height. The risk bar remained sticky | The narrower viewport is a desktop Safari measurement; a physical iPad remains unverified |
+| Charts and connected navigation | Exact dataset detail displayed source information, content hash, a raw table and an SVG chart. Two synthetic series produced a strict comparison and a comparison chart. Dataset-to-research-pack and pack-to-exact-dataset navigation passed | The calculation describes compatible saved observations. It adds no FX conversion, missing observations, dividends, fees or annualization |
+| Reference-only research | The explicit literal query `Koyfin` returned zero saved metadata records, zero datasets and one dated catalog reference. Its review packet retained `evidence_status: reference_only` without claiming full-text access | A dated navigation reference is not acquired news, numeric data, runtime source acceptance or a data API grant |
+| Review-packet export | Clicking the export control generated a Blob whose inspected JSON retained the notice in every chunk, computed numeric checks, `local_only: true`, `model_calls_performed: false`, `review_status: not_performed`, two unstarted reviewers and the paid-media hold | The test suppressed the physical download. Blob generation/content inspection is not a completed browser file download or a completed two-model review |
+| Settled visual inspection | Final screenshots were captured after two `requestAnimationFrame` cycles following scrolling and were visually inspected | Initial timing captures were not promoted into settled visual evidence. Screenshots alone do not establish the full workflow |
+
+The HTTP request path and MCP open the selected database in read-only SQLite mode. Explicit local CLI import remains the write boundary. Source acquisition, paid-media collection, remote models, trading, notifications and global client registration were not activated by these checks.
+
+Remaining acceptance work: a physical iPad, visible notice rendering in a named external editor, actual execution of two explicitly selected local models, and a physical browser download. Remote CI for the current version remains pending until its own publication and Actions run are read back. The fixed earlier public commit and Actions receipt below remain historical evidence only.
+
+## Historical initial baseline acceptance on 2026-11-06
 
 | Layer | Pass condition | Observed result |
 | --- | --- | --- |
@@ -33,7 +55,7 @@ The page preview shows synthetic data in actual Safari: [workbench screenshot](i
 
 First complete publication: [fa442465786a6c2e8ec200f41059a92dd8e6d6ca](https://github.com/alysaallena-sys/financial-research-hub/commit/fa442465786a6c2e8ec200f41059a92dd8e6d6ca). The corresponding [Offline tests run 42245387434](https://github.com/alysaallena-sys/financial-research-hub/actions/runs/42245387434) was read back as success, with both Python versions successful. This receipt refers to a fixed version. Results for later commits must come from their corresponding Actions run records.
 
-## MCP extension acceptance on 2026-11-06
+## Earlier metadata/research-pack extension acceptance on 2026-11-06
 
 The MCP-specific local unittest run passed two cases using the actual official SDK `mcp==2.3.0` and child stdio servers. The client negotiated `2026-07-28` with `mode="auto"` and `2025-11-25` with `mode="legacy"`.
 

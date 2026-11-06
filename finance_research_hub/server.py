@@ -67,6 +67,8 @@ def make_handler(db_path: str, static_dir: Path = STATIC) -> type[BaseHTTPReques
                     self.send_json(envelope([], error="Not found"), 404)
                     return
                 self.send_body(target.read_bytes(), (mimetypes.guess_type(target.name)[0] or "application/octet-stream") + ("; charset=utf-8" if target.suffix in {".html", ".js", ".css", ".svg"} else ""))
+            except LookupError as exc:
+                self.send_json(envelope([], error=str(exc)), 404)
             except (ValueError, TypeError) as exc:
                 self.send_json(envelope([], error=str(exc)), 400)
             except Exception:
@@ -77,7 +79,7 @@ def make_handler(db_path: str, static_dir: Path = STATIC) -> type[BaseHTTPReques
             limit = int(one("limit", "100"))
             filters = {key: one(key) for key in ("kind", "provider", "symbol", "q")}
             filters["limit"] = limit
-            workspace = ResearchWorkspace(db_path, store_factory=Store)
+            workspace = ResearchWorkspace(db_path, read_only=True, store_factory=Store)
             if path == "/api/items":
                 self.send_json(workspace.search(**filters))
             elif path == "/api/status":
@@ -98,6 +100,18 @@ def make_handler(db_path: str, static_dir: Path = STATIC) -> type[BaseHTTPReques
                 result = workspace.research_pack(record_id=one("record_id"), symbol=one("symbol"), q=one("q"),
                                                  limit=limit, history_limit=int(one("history_limit", "20")))
                 self.send_json(result, 404 if result.get("missing_reason") else 200)
+            elif path == "/api/datasets":
+                self.send_json(workspace.datasets(kind=one("kind"), symbol=one("symbol"), q=one("q"), limit=limit))
+            elif path.startswith("/api/datasets/"):
+                result = workspace.get_dataset(unquote(path[len("/api/datasets/"):]))
+                self.send_json(result, 200 if result["found"] else 404)
+            elif path == "/api/compare":
+                self.send_json(workspace.compare(one("ids").split(","), alignment=one("alignment", "strict"), start=one("start"), end=one("end")))
+            elif path == "/api/review-packet":
+                identifiers = one("dataset_ids")
+                self.send_json(workspace.review_packet(record_id=one("record_id"), symbol=one("symbol"), q=one("q"),
+                                                      dataset_ids=identifiers.split(",") if identifiers else [],
+                                                      question=one("question"), limit=int(one("limit", "20"))))
             else:
                 self.send_json(envelope([], error="Not found"), 404)
 

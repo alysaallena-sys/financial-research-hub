@@ -44,6 +44,17 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(len(self.store.query(provider="demo")), 1)
         self.assertEqual(len(self.store.query(q="新的%标题")), 0)
 
+    def test_provider_limit_keeps_export_import_identity_stable(self):
+        with self.assertRaisesRegex(ValueError, "provider.*100"):
+            self.store.ingest([{**self.raw, "provider": "p" * 101}])
+        self.assertEqual(self.store.query(), [])
+        self.store.ingest([{**self.raw, "provider": "p" * 100}])
+        saved = self.store.query()[0]
+        self.assertEqual(len(saved["provider"]), 100)
+        self.assertEqual(normalize_record(saved)["id"], saved["id"])
+        self.assertEqual(self.store.ingest([saved])["unchanged"], 1)
+        self.assertEqual(len(self.store.query()), 1)
+
     def test_batch_validation_precedes_write(self):
         with self.assertRaises(ValueError):
             self.store.ingest([self.raw, {**self.raw, "url": "javascript:alert(1)"}])

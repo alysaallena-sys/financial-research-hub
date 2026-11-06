@@ -4,7 +4,9 @@
 
 Investing involves risk. Analysis and query results do not constitute investment advice.
 
-This project combines public information and research-report metadata interfaces. The table below records the fixed sources reviewed before implementation. The third-party projects provide interface or design references; this project does not bundle their source code or research databases. Any future code reuse requires a separate review of the specific file's license, attribution requirements and compatibility.
+This project combines public information, research-report metadata and explicitly reviewed public-data interfaces. The table below records fixed source references. The third-party projects provide interface or design references; this project does not bundle their source code or research databases. Any future code reuse requires a separate review of the specific file's license, attribution requirements and compatibility.
+
+Use the [canonical workspace requirements](FINANCE-WORKSPACE.md) to determine each source's role. The packaged [workspace policy and research catalog](../finance_research_hub/workspace-policy.json) supplies the same source-role boundaries to application surfaces. A catalog entry is not permission to acquire or redistribute data.
 
 ## Reviewed projects
 
@@ -16,6 +18,8 @@ This project combines public information and research-report metadata interfaces
 | [manymore13/report](https://github.com/manymore13/report/tree/4818d294141c827ae056babfe1c63a51b0e4103d) · `4818d294141c827ae056babfe1c63a51b0e4103d` | Apache-2.0 | Reading organization through daily, weekly, monthly and industry indexes; the index repository is not a complete collector |
 | [yfinance](https://github.com/ranaroussi/yfinance/tree/e2f6104164b70085556fe2f8e194cf3ca18550f5) · `e2f6104164b70085556fe2f8e194cf3ca18550f5` | Apache-2.0; the README notes personal-use conditions for Yahoo data | Yahoo-aggregated institutional rating events and consensus price targets; yfinance has no official affiliation with Yahoo |
 | [equity-research-reports-skill](https://github.com/Ray-Yuan21/equity-research-reports-skill/tree/0b0e11c133768681fb73bc33c3b779fdb0c93b3d) · `0b0e11c133768681fb73bc33c3b779fdb0c93b3d` | MIT | Source, freshness and manifest conventions for public candidates; its open-source search script only generates query plans |
+| [AKTools](https://github.com/akfamily/aktools/tree/b22c979fa1b018b1dba7353df12ca281b5fe3835) · `b22c979fa1b018b1dba7353df12ca281b5fe3835` | MIT; dated source review on 2026-11-02, version 0.1.4 | Discovery-first `search_interfaces` → `describe_interface` → `get_data`; approved interfaces and explicit schemas before collection. No package installation, live data or client acceptance in that review |
+| [DBX v0.6.64](https://github.com/t8y2/dbx/tree/c107fa773905994a726bbba19cfaaa42a4ecd678) · `c107fa773905994a726bbba19cfaaa42a4ecd678` | Apache-2.0; dated source review on 2026-11-02 | Candidate for manual SQLite inspection and maintenance. Reviewed [main](https://github.com/t8y2/dbx/tree/51f31ef6aa9aeb7a128639121b29202e87e979ec) differs from the stable release; no installation, database access, locking or model/client acceptance |
 
 AKShare, report-cli and the monitor above mainly use Eastmoney-related interfaces. Matching results from different libraries do not establish multiple independent data sources.
 
@@ -43,11 +47,32 @@ A readable page, an obtainable URL or an MIT/Apache software license does not by
 
 | Project | Reason |
 | --- | --- |
-| [efinance](https://github.com/Micro-sheep/efinance/tree/c8fd370a3109b2d14a121e3a32a86e9c8354b01b) | The reviewed source disables certificate verification in some paths and also uses HTTP. Its README noncommercial statement coexists with MIT license text. These issues remain unresolved, so it is not a default dependency |
-| [FinceptTerminal](https://github.com/Fincept-Corporation/FinceptTerminal/tree/7716ee8613249fb44c4d14036c5bc16ed6f34e97) | License files conflict at the fixed commit. It also includes cloud-model, external-MCP and live-trading paths. This project references only its functional workbench organization and does not copy its UI, assets or code |
+| [efinance](https://github.com/Micro-sheep/efinance/tree/c8fd370a3109b2d14a121e3a32a86e9c8354b01b) | The reviewed source disables certificate verification in some paths and also uses HTTP. Its README noncommercial statement coexists with MIT license text. Three isolated, security-patched paths passed bounded requests on 2026-11-06: stock history, fund NAV and convertible-bond base data. This does not establish safe upstream defaults or an integrated production adapter; it is not a default dependency |
+| [FinceptTerminal](https://github.com/Fincept-Corporation/FinceptTerminal/tree/7716ee8613249fb44c4d14036c5bc16ed6f34e97) | License documents conflict at the fixed commit. It also includes cloud-model, external-MCP and live-trading paths. One isolated World Bank connector/source path parsed a bounded response on 2026-11-06. Native desktop installation and other connectors remain unverified. This project does not copy its UI, assets or code |
 | [ReportGem](https://github.com/littlemosquito123/reportgem-global-research/tree/835da7dc04df38856d5152324cf64690f4d556a7) | The repository provides connection documentation for a commercial remote MCP service. The official terms summary restricts bulk scraping, database building and redistribution. Paid services and account access are outside the default scope |
 
 ReportGem's website rules can differ from its fixed README. The review found updated search-pricing and subscription rules on the website. Any later evaluation must reread the [official documentation](https://www.reportgem.com/en/mcp.html) and full terms rather than promise old prices.
+
+The efinance test matched the official 0.5.9 package's Python source to the fixed commit before applying transport-only changes. It replaced insecure certificate/HTTP behavior inside an isolated request boundary; it did not weaken TLS or modify this project's production network rules. Fund NAV, estimated changes and dated holdings disclosures remain different datasets. The Fincept check exercised only the original [World Bank connector](https://github.com/Fincept-Corporation/FinceptTerminal/blob/7716ee8613249fb44c4d14036c5bc16ed6f34e97/fincept-qt/scripts/worldbank_data.py) path; Python timed out, then one explicitly scoped system-curl request to the same source succeeded. Neither check grants data-retention or redistribution rights.
+
+## Market navigation and official connectors: dated 2026-11-02 review
+
+These entries preserve earlier source findings. They are not fresh runtime checks or active integrations. Recheck the source's current documentation and terms before implementation.
+
+| Source | Official evidence | Workspace role and unresolved boundary |
+| --- | --- | --- |
+| Finviz | [Official Maps embed announcement](https://finviz.com/blog/you-can-now-embed-finviz-maps-on-your-website-blog-or-app-2/), [official API announcement](https://finviz.com/blog/our-upgraded-api-higher-limits-clearer-data-and-more-ways-to-connect/) | Map-embed/API candidates. Neither was connected locally. API account rights, retention and redistribution remain separate questions |
+| Koyfin | [API FAQ](https://www.koyfin.com/help/faq/can-i-get-the-data-via-api/), [download FAQ](https://www.koyfin.com/help/faq/can-i-download-data/), [pricing](https://www.koyfin.com/pricing/) | Manual research and interaction reference. The FAQ offered no data API; download scope differs by data type. A contextual question button is not an API grant |
+| Stock Analysis | [API-access FAQ](https://stockanalysis.com/help/faq/api-access/), [terms](https://stockanalysis.com/terms-of-use/) | Company-research navigation. No general API/MCP connection or bulk collector accepted |
+| ETFdb / VettaFi | [VettaFi terms](https://www.vettafi.com/terms-of-use) | ETF-research navigation. Website requests failed during the dated review; export/API and internal-database rights remain unconfirmed |
+| CompaniesMarketCap | [Official API page](https://companiesmarketcap.com/stockmarket-api/) | Ranking and discovery reference. The page did not offer its own API; an external recommendation is a different provider |
+| MacroMicro | [Official data-download FAQ](https://support.macromicro.me/en/faq/182) | Macro-theme navigation. Download and enterprise/API rights depend on the relevant plan; no client or source acceptance |
+| FRED / ALFRED | [Official FRED MCP connector guide](https://fred.stlouisfed.org/help/data/connecting-fred-to-ai-services/FRED-MCP-Connector), [service terms](https://fred.stlouisfed.org/legal/) | Official query connector documented, not registered. Host/account authorization and local acceptance remain unperformed. Query support does not grant unrestricted archiving or a persistent database. Retain observation, release, retrieval and vintage times |
+| Seeking Alpha | [Official terms](https://about.seekingalpha.com/terms) | Opinion navigation only; paid-content collection is held |
+| Reddit | [Responsible Builder Policy](https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy) | Research leads only. API approval and original-source verification remain separate; discussion popularity does not verify facts |
+| AnalysisSite | [Original deployment](https://analysissite.vercel.app/) | The dated review observed a paused deployment. Author, repository, data rights, citations and functions remain unverified |
+
+FRED's official connector supports a query workflow. This statement does not classify all AI reading as prohibited. Apply the actual service terms to the proposed retention and use. Similarly, an existing browser subscription to WSJ or another paid site does not activate collection in this project. The later paid-media hold controls the current workspace scope.
 
 ## HTTPS transport and the TED path
 

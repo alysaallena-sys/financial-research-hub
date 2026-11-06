@@ -15,6 +15,7 @@ The bundled product uses a Simplified Chinese interface. Preserve the required C
 ## Integration steps
 
 1. Read the [machine-readable contract](editor-contract.json), the project license and the source terms.
+   Read the [canonical workspace requirements](../docs/FINANCE-WORKSPACE.md) and the packaged [workspace policy](../finance_research_hub/workspace-policy.json). Preserve their paid-media hold, local-only model boundary and source-role distinctions.
 2. Add the rules below to the editor's project rules or the knowledge base's system instructions.
 3. Before import, check every record's `risk_notice`, source, date and `is_demo`. Reject incomplete records or regenerate a complete export first.
 4. When splitting content, retain the notice in both the chunk text and chunk metadata. Inheriting only parent-document metadata is insufficient.
@@ -37,6 +38,13 @@ Financial Research Hub integration rules:
 - Cite original source, direct provider and publication date when available.
 - Preserve is_demo and clearly mark synthetic examples.
 - Do not bypass source access controls or assume third-party redistribution rights.
+- Distinguish a saved metadata record from a full source reading.
+- Keep dataset units, currency, adjustments, dates and calculation methods.
+- Use deterministic calculations for numerical claims.
+- A reviewer packet does not prove that a model or cross-check ran.
+- Use two independent local reviewers only when the host explicitly runs them.
+- Do not send private material to cloud models or through external question URLs.
+- Keep paid-media acquisition paused.
 ```
 
 ## Integration acceptance

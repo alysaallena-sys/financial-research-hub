@@ -8,6 +8,8 @@ Investing involves risk. Analysis and query results do not constitute investment
 
 Bring public news, TED entries, broker-report metadata and overseas analyst-rating events into one local research workspace. Preserve sources and dates, compare new and updated records, and export material with its risk notice for personal research.
 
+The [canonical finance workspace requirements](docs/FINANCE-WORKSPACE.md) connect the source catalog, evidence rules, numerical-workbench plan and local review workflow. The packaged [workspace policy](finance_research_hub/workspace-policy.json) is the machine-readable source for those boundaries and the research-navigation catalog. A navigation entry does not activate a collector or grant data-use rights.
+
 The bundled interface currently uses Simplified Chinese. Repository documentation is English-first. The required Chinese risk notice remains unchanged in the interface and output contract.
 
 ![The workspace running in Safari; all content shown is synthetic demo data](docs/images/demo-workspace.png)
@@ -22,8 +24,10 @@ The bundled interface currently uses Simplified Chinese. Repository documentatio
 | Change history | Local SQLite snapshots that distinguish first observation, new records, updates and unchanged records |
 | Search and briefs | Filters for type, source, symbol and keywords, plus source-linked metadata briefs |
 | Connected research | Exact record lookup, scoped history, provenance, coverage and retrieval chunks in one research pack |
+| Typed numerical evidence | Local JSON imports, exact datasets, explicit record/topic links and compatible price/NAV comparisons |
+| Local review handoff | Source-linked evidence packets and separate first-review/challenge instructions; no model calls |
 | Knowledge-base exports | JSON, CSV, Markdown and retrieval chunks that retain risk notices, sources and demo labels |
-| Read-only MCP | Seven tools, policy/catalog/schema resources, an exact-record resource template and a research prompt over one existing local database |
+| Read-only MCP | Eleven tools, policy/catalog/schema resources, exact-record/dataset templates and research/cross-check prompts over one existing local database |
 
 Available report fields depend on the selected interface. A report-list record does not contain the report's full text. A rating event does not contain an investment bank's complete reasoning. Programs that share Eastmoney or Yahoo still share the same direct data provider.
 
@@ -57,6 +61,14 @@ python -m finance_research_hub --db .local/demo.sqlite3 export --format jsonl
 
 Use `python -m finance_research_hub --help` and each subcommand's help for the current options. Omitting `--db` selects `.local/research.sqlite3`. JSON includes records and retrieval chunks with notices; JSONL emits one chunk per line. Empty JSONL and CSV exports still contain one `record_type: notice` entry. It is a notice, not a research item; importers must distinguish the types. Search and export read the local database without starting collection, model calls or PDF downloads.
 
+To bring reviewed metadata from another permitted export into this workspace, use an explicit current-schema JSON file:
+
+```sh
+python -m finance_research_hub --db .local/research.sqlite3 import-records /absolute/path/to/reviewed-records.json
+```
+
+The input is an array of records or an object with an `items` array, bounded to 2 MiB and 1,000 records. The importer validates the batch before writing. It preserves source identity and publication dates; a missing original retrieval time remains `unknown`. It does not scan another database, map a legacy catalog or resume its collector. See the [integration contract](docs/FINANCE-WORKSPACE.md#explicit-record-interchange).
+
 ## Connected research workflow
 
 Search saved metadata, select an exact record, inspect its own changes, and build a pack containing sources, coverage, missing information and notice-preserving retrieval chunks. Replace `RECORD_ID` below with an actual stable ID returned by the query:
@@ -69,7 +81,25 @@ python -m finance_research_hub --db .local/demo.sqlite3 pack --record-id RECORD_
 
 You can also select a pack with an exact `--symbol` or literal `--q`. Matching metadata establishes the selection rule, not a causal connection or independent corroboration. An untagged anchor stays anchor-only unless you explicitly supply a topic. See the [coverage matrix](docs/COVERAGE.md).
 
+Research must distinguish source facts, institutional opinions and generated inference. Numerical claims need deterministic calculations with dates, units, currency, adjustment and method. Cross-checking requires two independent local review passes over the same evidence. A generated review packet or prompt does not mean either model ran; the project does not activate a cloud model or transmit private material through an external site's question URL.
+
 In the page's research workflow, the JSON pack export retains provenance, history, coverage and retrieval chunks. The Markdown option exports a material summary containing entries and summaries; it does not contain the complete pack. Its filename is `research-summary-YYYY-MM-DD.md`, while the JSON pack uses `research-pack-YYYY-MM-DD.json`.
+
+## Saved datasets and numerical review
+
+The numerical extension keeps typed datasets in the same SQLite workspace, separately from news/report records. Import only a reviewed local JSON file. The command does not collect a source:
+
+```sh
+python -m finance_research_hub --db .local/research.sqlite3 import-dataset /absolute/path/to/reviewed-dataset.json
+python -m finance_research_hub --db .local/demo.sqlite3 datasets
+python -m finance_research_hub --db .local/demo.sqlite3 dataset DATASET_ID
+python -m finance_research_hub --db .local/demo.sqlite3 compare DATASET_A DATASET_B --alignment strict
+python -m finance_research_hub --db .local/demo.sqlite3 review-packet --q synthetic --dataset-id DATASET_A --dataset-id DATASET_B
+```
+
+Replace dataset placeholders with exact saved IDs. `demo` includes two synthetic daily series. Comparisons require two to five compatible saved price/NAV series and calculate an index starting at 100, observed-period return and sampled maximum drawdown. Explicit `intersection` alignment may remove dates; retain the reported method and exclusions. No FX, interpolation, dividend reinvestment or annualization occurs.
+
+The [canonical guide](docs/FINANCE-WORKSPACE.md#typed-datasets-in-the-existing-workspace) specifies the import schema, immutable snapshot identity, row limits, preview limits, missing-value rules, comparison bases and unexecuted local-review packet. Local version 0.3.0 acceptance passed 95 tests, both actual SDK stdio modes, twelve read-only HTTP checks over imported non-demo datasets, and Safari chart/navigation checks at desktop and narrower viewports. Review-packet Blob content was inspected with the physical download suppressed. See the [acceptance scope](docs/ACCEPTANCE.md) for limits; no model execution or physical-iPad acceptance is claimed.
 
 ## Connect through MCP
 
@@ -82,7 +112,7 @@ python -m finance_research_hub.mcp_server --db .local/demo.sqlite3
 
 The MCP host normally launches the second command. Stdio uses stdin/stdout, not an HTTP port. The database must already exist; MCP opens SQLite with `mode=ro` and cannot create tables, change records or acquire live sources. It offers saved-workspace search, exact records, scoped changes, research packs and exports, with the risk notice in both text and structured results.
 
-Local SDK acceptance passed in both `auto` (`2026-07-28`) and `legacy` (`2025-11-25`) modes. This does not establish acceptance in an arbitrary editor or prove that its UI displays the notice. Read the [MCP guide](docs/MCP.md), review the [host configuration example](integrations/mcp-stdio.example.json), and use the [SDK-client acceptance helper](integrations/mcp_client_acceptance.py) with a dedicated synthetic database. No global client registration is performed.
+Local version 0.3.0 SDK acceptance passed the eleven-tool interface in both `auto` (`2026-07-28`) and `legacy` (`2025-11-25`) modes. Both exact owned child processes exited with code 0, and the synthetic database hash remained unchanged. This does not establish acceptance in an arbitrary editor or prove that its UI displays the notice. Read the [MCP guide](docs/MCP.md), review the [host configuration example](integrations/mcp-stdio.example.json), and use the [SDK-client acceptance helper](integrations/mcp_client_acceptance.py) with a dedicated synthetic database. No global client registration is performed.
 
 ## Optional live metadata collection
 
@@ -124,6 +154,8 @@ Bounded checks on 2026-11-06 retrieved BBC and Guardian feed metadata and one pa
 
 The project does not bundle paid report databases, collect paid media, download report PDFs, execute trades, or automatically run models, notifications or scheduled jobs. Preserve a source-access failure as a failure. Do not bypass source restrictions.
 
+The paid-media hold includes WSJ and supersedes the earlier daily three-Opinion analysis idea. Koyfin remains a market-workbench and contextual-research reference; it is not an approved data API. AKTools, efinance, Fincept and DBX retain separate candidate and acceptance states in the [integration map](docs/FINANCE-WORKSPACE.md). Their presence in the catalog does not install them or configure an account.
+
 ## Editor, agent and knowledge-base integration
 
 **Every integration that uses this project to build a knowledge base must make the editor visibly display this exact Chinese notice with query and analysis results:**
@@ -135,6 +167,7 @@ Retain the same notice in every record, retrieval chunk and export. Hidden metad
 - Machine-readable contract: [integrations/editor-contract.json](integrations/editor-contract.json)
 - Integration and acceptance steps: [integrations/editor-instructions.md](integrations/editor-instructions.md)
 - Project agent rules: [AGENTS.md](AGENTS.md)
+- Inherited finance requirements and current evidence: [docs/FINANCE-WORKSPACE.md](docs/FINANCE-WORKSPACE.md)
 
 The bundled page, CLI and export paths implement notice retention. This repository cannot technically force an unrelated editor to follow the rules. External integrators must check the final display and must not claim compliance before that check passes.
 

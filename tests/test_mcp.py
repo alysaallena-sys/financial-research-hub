@@ -14,11 +14,12 @@ import unittest
 
 from finance_research_hub import RISK_NOTICE
 from finance_research_hub.core import Store, demo_records
+from finance_research_hub.evidence import demo_datasets
 
 HAS_MCP = importlib.util.find_spec("mcp") is not None
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = {"workspace_status", "list_sources", "search_records", "get_record", "get_changes",
-         "build_research_pack", "export_records"}
+         "build_research_pack", "export_records", "list_datasets", "get_dataset", "compare_datasets", "build_review_packet"}
 
 
 @unittest.skipUnless(HAS_MCP, "Install the optional pinned MCP SDK to run actual stdio acceptance")
@@ -60,6 +61,25 @@ class StdioAcceptance(unittest.TestCase):
                 self.assertTrue(pack["chunks"])
                 for chunk in pack["chunks"]:
                     self.assertIn(RISK_NOTICE, chunk["content"])
+                dataset_list = await call("list_datasets", {})
+                self.assertEqual(dataset_list["count"], 2)
+                identifiers = [item["id"] for item in dataset_list["items"]]
+                exact_dataset = await call("get_dataset", {"dataset_id": identifiers[0]})
+                self.assertTrue(exact_dataset["dataset"]["rows"])
+                for row in exact_dataset["dataset"]["rows"]:
+                    self.assertEqual(row["risk_notice"], RISK_NOTICE)
+                compared = await call("compare_datasets", {"dataset_ids": identifiers})
+                self.assertEqual(len(compared["curves"]), 2)
+                self.assertEqual(compared["curves"][0]["points"][0]["indexed_value"], 100)
+                self.assertFalse(compared["model_calls_performed"])
+                packet = await call("build_review_packet", {"record_id": record_id, "dataset_ids": identifiers})
+                self.assertTrue(packet["local_only"])
+                self.assertFalse(packet["model_calls_performed"])
+                self.assertEqual(packet["review_status"], "not_performed")
+                self.assertEqual(packet["source_access"]["paid_media_collection"], "paused")
+                self.assertEqual(len(packet["review_workflow"]["reviewers"]), 2)
+                for chunk in packet["chunks"]:
+                    self.assertIn(RISK_NOTICE, chunk["content"])
                 for fmt in ["json", "jsonl", "csv", "markdown"]:
                     exported = await call("export_records", {"format": fmt, "q": "no-such-fixture", "limit": 10})
                     self.assertIn(RISK_NOTICE, exported["content"])
@@ -70,14 +90,17 @@ class StdioAcceptance(unittest.TestCase):
                     ("get_record", {"record_id": "missing"}),
                     ("build_research_pack", {}),
                     ("export_records", {"format": "html"}),
+                    ("get_dataset", {"dataset_id": "missing"}),
+                    ("compare_datasets", {"dataset_ids": identifiers[:1]}),
+                    ("build_review_packet", {}),
                     ("run_shell", {"command": "unused"}),
                 ]:
                     await call(name, arguments, error=True)
                 resources = (await client.list_resources()).resources
-                self.assertEqual({str(x.uri) for x in resources}, {"finance://policy", "finance://catalog", "finance://schema"})
+                self.assertEqual({str(x.uri) for x in resources}, {"finance://policy", "finance://catalog", "finance://schema", "finance://workspace-policy"})
                 templates = (await client.list_resource_templates()).resource_templates
-                self.assertEqual({x.uri_template for x in templates}, {"finance://records/{record_id}"})
-                for uri in ["finance://policy", "finance://catalog", "finance://schema", "finance://records/" + record_id]:
+                self.assertEqual({x.uri_template for x in templates}, {"finance://records/{record_id}", "finance://datasets/{dataset_id}"})
+                for uri in ["finance://policy", "finance://catalog", "finance://schema", "finance://workspace-policy", "finance://records/" + record_id, "finance://datasets/" + identifiers[0]]:
                     resource = await client.read_resource(uri)
                     self.assertTrue(any(RISK_NOTICE in part.text for part in resource.contents if hasattr(part, "text")))
                 with self.assertRaises(Exception) as raised:
@@ -85,11 +108,15 @@ class StdioAcceptance(unittest.TestCase):
                 self.assertIn(RISK_NOTICE, str(raised.exception))
                 prompt = await client.get_prompt("research_prompt", {"topic": "DEMO-CN"})
                 self.assertTrue(any(RISK_NOTICE in message.content.text for message in prompt.messages))
+                cross_prompt = await client.get_prompt("cross_check_prompt", {"topic": "DEMO-CN"})
+                self.assertTrue(any(RISK_NOTICE in message.content.text for message in cross_prompt.messages))
 
         with tempfile.TemporaryDirectory(prefix="financial-hub-mcp-test-") as temporary:
             db = Path(temporary) / "synthetic.sqlite3"
             with Store(db) as store:
                 store.ingest(demo_records())
+                for dataset in demo_datasets():
+                    store.import_dataset(dataset)
                 record_id = store.query(kind="research")[0]["id"]
             before = hashlib.sha256(db.read_bytes()).hexdigest()
             for mode in ["auto", "legacy"]:

@@ -47,6 +47,8 @@ def normalize_record(raw: dict[str, Any]) -> dict[str, Any]:
     title = str(raw.get("title") or "").strip()
     if not provider or not title:
         raise ValueError("provider and title are required")
+    if len(provider) > 100:
+        raise ValueError("provider must have at most 100 characters")
     url = safe_url(str(raw.get("url", "")))
     upstream_id = str(raw.get("upstream_id") or raw.get("id") or url)
     identity = hashlib.sha256(f"{provider}\0{kind}\0{upstream_id}".encode()).hexdigest()
@@ -63,7 +65,7 @@ def normalize_record(raw: dict[str, Any]) -> dict[str, Any]:
         "title": title[:1000],
         "url": url,
         "source": str(raw.get("source") or provider)[:200],
-        "provider": provider[:100],
+        "provider": provider,
         "published_at": str(raw.get("published_at") or ""),
         "symbol": str(raw.get("symbol") or "")[:100],
         "institution": str(raw.get("institution") or "")[:200],
@@ -134,6 +136,12 @@ class Store:
               sequence INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL,
               observed_at TEXT NOT NULL, payload TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS changes_item_sequence ON changes(item_id,sequence DESC);
+            CREATE TABLE IF NOT EXISTS datasets (
+              id TEXT PRIMARY KEY, kind TEXT NOT NULL, symbol TEXT NOT NULL,
+              provider TEXT NOT NULL, source_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
+              payload TEXT NOT NULL, first_seen_at TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS datasets_kind_symbol ON datasets(kind,symbol);
+            CREATE INDEX IF NOT EXISTS datasets_symbol ON datasets(symbol);
         """)
         self.db.commit()
 
@@ -274,6 +282,107 @@ class Store:
         self._read_tick()
         rows = self.db.execute("SELECT provider, MAX(sequence) AS n FROM collections GROUP BY provider").fetchall()
         return [json.loads(self.db.execute("SELECT payload FROM collections WHERE sequence=?", (r["n"],)).fetchone()[0]) for r in rows]
+
+    def dataset_schema_available(self) -> bool:
+        self._read_tick()
+        return self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='datasets'").fetchone() is not None
+
+    def import_dataset(self, raw: dict[str, Any]) -> dict[str, Any]:
+        from .evidence import CONTENT_HASH_BASIS, normalize_dataset
+        if self.read_only:
+            raise PermissionError("Read-only workspace does not permit dataset import")
+        dataset = normalize_dataset(raw)
+        serialized = canonical(dataset)
+        digest = hashlib.sha256(serialized.encode()).hexdigest()
+        with self.db:
+            old = self.db.execute("SELECT fingerprint,first_seen_at FROM datasets WHERE id=?", (dataset["id"],)).fetchone()
+            if old and old["fingerprint"] != digest:
+                raise ValueError("Dataset ID is immutable; use a new versioned source_id for changed evidence")
+            first_seen = old["first_seen_at"] if old else utc_now()
+            if not old:
+                self.db.execute("INSERT INTO datasets VALUES(?,?,?,?,?,?,?,?)", (
+                    dataset["id"], dataset["kind"], dataset["symbol"] or "", dataset["provenance"]["provider"],
+                    dataset["source_id"], digest, serialized, first_seen))
+        return {"status": "unchanged" if old else "new", "dataset": {**dataset, "first_seen_at": first_seen,
+                "content_hash": digest, "hash_basis": CONTENT_HASH_BASIS}}
+
+    def get_dataset(self, identifier: str) -> dict[str, Any] | None:
+        from .evidence import CONTENT_HASH_BASIS, dataset_id
+        dataset_id(identifier)
+        if not self.dataset_schema_available():
+            return None
+        row = self.db.execute("SELECT payload,first_seen_at,fingerprint FROM datasets WHERE id=?", (identifier,)).fetchone()
+        if not row:
+            return None
+        item = json.loads(row["payload"])
+        item["first_seen_at"] = row["first_seen_at"]
+        item.update(content_hash=row["fingerprint"], hash_basis=CONTENT_HASH_BASIS)
+        item.update(risk_notice=RISK_NOTICE, noncommercial=True)
+        for value in item["rows"]:
+            value.update(risk_notice=RISK_NOTICE, noncommercial=True, is_demo=item["is_demo"])
+        return item
+
+    def dataset_counts(self) -> dict[str, Any]:
+        from .evidence import DATASET_KINDS
+        counts = {kind: 0 for kind in sorted(DATASET_KINDS)}
+        if not self.dataset_schema_available():
+            return {"counts_by_dataset_kind": counts, "dataset_count": 0, "demo_dataset_count": 0,
+                    "dataset_schema_available": False}
+        counts.update({row["kind"]: row["n"] for row in self.db.execute("SELECT kind,COUNT(*) AS n FROM datasets GROUP BY kind")})
+        demos = 0
+        for row in self.db.execute("SELECT payload FROM datasets"):
+            self._read_tick()
+            demos += json.loads(row[0]).get("is_demo") is True
+        return {"counts_by_dataset_kind": counts, "dataset_count": sum(counts.values()),
+                "demo_dataset_count": demos, "dataset_schema_available": True}
+
+    def dataset_details(self, *, kind: str = "", symbol: str = "", q: str = "", limit: int = 100,
+                        related_record_ids: list[str] | None = None) -> dict[str, Any]:
+        from .evidence import CONTENT_HASH_BASIS, DATASET_KINDS, dataset_id, dataset_summary
+        if kind and kind not in DATASET_KINDS:
+            raise ValueError("Unknown numeric dataset kind")
+        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
+            raise ValueError("Dataset limit must be between 1 and 1000")
+        if related_record_ids is not None:
+            if len(related_record_ids) > 101:
+                raise ValueError("Related dataset selection supports at most 101 record IDs")
+            for identifier in related_record_ids:
+                dataset_id(identifier)
+        if not self.dataset_schema_available():
+            return {"items": [], "returned": 0, "total_matches": 0, "limit": limit,
+                    "truncated": False, "schema_available": False}
+        conditions, params = [], []
+        if related_record_ids is None:
+            for column, value in (("kind", kind), ("symbol", symbol)):
+                if value:
+                    conditions.append(column + "=?")
+                    params.append(value)
+        sql = "SELECT payload,first_seen_at,fingerprint FROM datasets" + (" WHERE " + " AND ".join(conditions) if conditions else "")
+        rows = self.db.execute(sql, params)
+        total = 0
+        wanted_links = set(related_record_ids or [])
+        def matching():
+            nonlocal total
+            for row in rows:
+                self._read_tick()
+                item = json.loads(row["payload"])
+                item["first_seen_at"] = row["first_seen_at"]
+                item.update(content_hash=row["fingerprint"], hash_basis=CONTENT_HASH_BASIS)
+                haystack = " ".join((item["title"], item.get("symbol") or "", " ".join(item.get("topics", [])), canonical(item["provenance"]))).casefold()
+                matched = (not kind or item["kind"] == kind) and (not symbol or item.get("symbol") == symbol) and (not q or q.casefold() in haystack)
+                linked = bool(wanted_links.intersection(item.get("related_record_ids", [])))
+                if related_record_ids is not None:
+                    matched = linked or (bool(symbol or q) and matched)
+                if not matched:
+                    continue
+                total += 1
+                summary = dataset_summary(item)
+                if related_record_ids is not None:
+                    summary["relationship_basis"] = "explicit_record_link" if linked else "exact_symbol_and_literal_query" if symbol and q else "exact_symbol" if symbol else "literal_query"
+                yield summary
+        selected = heapq.nlargest(limit, matching(), key=lambda item: (item.get("as_of") or "", item["id"]))
+        return {"items": selected, "returned": len(selected), "total_matches": total, "limit": limit,
+                "truncated": total > len(selected), "schema_available": True}
 
     def status(self) -> dict[str, Any]:
         self._read_tick()

@@ -1,12 +1,14 @@
-"""Independent notice/integration contract checks using synthetic memory-only inputs."""
+"""Offline notice and read-only presentation checks with synthetic inputs."""
 from __future__ import annotations
 
 import contextlib
 import csv
+import hashlib
 import io
 import json
 from pathlib import Path
 import sqlite3
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -15,6 +17,8 @@ from finance_research_hub import LICENSE_ID, RISK_NOTICE
 from finance_research_hub import cli, server
 from finance_research_hub.core import Store, brief, demo_records, envelope, export_items, normalize_record
 from finance_research_hub.providers import ProviderError, collect_eastmoney, validate_request_url
+from finance_research_hub.evidence import demo_datasets
+from finance_research_hub.service import ResearchWorkspace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -183,8 +187,14 @@ class PresentationBoundaryTests(unittest.TestCase):
         request = f"{method} {target} HTTP/1.0\r\nHost: {host}\r\n{extra}\r\n".encode()
         sock = MemorySocket(request)
         handler = server.make_handler(":memory:")
-        with patch.object(server, "Store", side_effect=lambda _: Store(":memory:")):
-            handler(sock, ("127.0.0.1", 12345), SimpleNamespace(server_port=8765))
+        # These response-contract checks inject a test-owned in-memory service.
+        # Actual server construction is exercised without mocks below.
+        with Store(":memory:") as store:
+            workspace = ResearchWorkspace(":memory:", store=store)
+            with patch.object(server, "ResearchWorkspace", return_value=workspace) as factory:
+                handler(sock, ("127.0.0.1", 12345), SimpleNamespace(server_port=8765))
+                if target.startswith("/api/") and method == "GET" and host == "127.0.0.1:8765" and origin is None:
+                    factory.assert_called_once_with(":memory:", read_only=True, store_factory=server.Store)
         head, body = bytes(sock.output).split(b"\r\n\r\n", 1)
         return int(head.split(b" ", 2)[1]), body.decode()
 
@@ -216,6 +226,53 @@ class PresentationBoundaryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 server.create_server(":memory:", host="0.0.0.0")
             create.assert_not_called()
+
+    def exchange_stored(self, db_path, target):
+        request = f"GET {target} HTTP/1.0\r\nHost: 127.0.0.1:8765\r\n\r\n".encode()
+        sock = MemorySocket(request)
+        server.make_handler(str(db_path))(sock, ("127.0.0.1", 12345), SimpleNamespace(server_port=8765))
+        head, body = bytes(sock.output).split(b"\r\n\r\n", 1)
+        return int(head.split(b" ", 2)[1]), json.loads(body)
+
+    def test_get_missing_database_does_not_create_database_or_directory(self):
+        with tempfile.TemporaryDirectory(prefix="finance-http-readonly-") as temporary:
+            missing = Path(temporary) / "not-created" / "absent.sqlite3"
+            status, body = self.exchange_stored(missing, "/api/status")
+            self.assertEqual(status, 500)
+            self.assertEqual(body["risk_notice"], RISK_NOTICE)
+            self.assertTrue(body["noncommercial"])
+            self.assertFalse(missing.exists())
+            self.assertFalse(missing.parent.exists())
+            self.assertEqual(list(Path(temporary).iterdir()), [])
+
+    def test_real_saved_database_get_routes_preserve_hash_and_schema(self):
+        with tempfile.TemporaryDirectory(prefix="finance-http-readonly-") as temporary:
+            # URI encoding must preserve both spaces and a literal hash character.
+            path = Path(temporary) / "saved # evidence.sqlite3"
+            with Store(path) as store:
+                store.ingest(demo_records())
+                record_id = store.query(limit=1)[0]["id"]
+                identifiers = [store.import_dataset(item)["dataset"]["id"] for item in demo_datasets()]
+                schema_before = store.db.execute("SELECT sql FROM sqlite_master ORDER BY name").fetchall()
+            hash_before = hashlib.sha256(path.read_bytes()).hexdigest()
+            files_before = sorted(item.name for item in Path(temporary).iterdir())
+            targets = ["/api/status", "/api/items", "/api/records/" + record_id,
+                       "/api/changes", "/api/sources", "/api/brief", "/api/export?format=json",
+                       "/api/pack?record_id=" + record_id, "/api/datasets",
+                       "/api/datasets/" + identifiers[0], "/api/compare?ids=" + ",".join(identifiers),
+                       "/api/review-packet?q=Koyfin"]
+            for target in targets:
+                with self.subTest(target=target):
+                    status, body = self.exchange_stored(path, target)
+                    self.assertEqual(status, 200)
+                    self.assertEqual(body["risk_notice"], RISK_NOTICE)
+                    self.assertTrue(body["noncommercial"])
+                    if target == "/api/status":
+                        self.assertTrue(body["read_only"])
+                    self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), hash_before)
+            with Store(path, read_only=True) as store:
+                self.assertEqual(store.db.execute("SELECT sql FROM sqlite_master ORDER BY name").fetchall(), schema_before)
+            self.assertEqual(sorted(item.name for item in Path(temporary).iterdir()), files_before)
 
     def test_source_allowlist_excludes_arbitrary_targets_and_pdf_downloads(self):
         for url in ("http://reportapi.eastmoney.com/report/list", "https://example.com/report.pdf",
