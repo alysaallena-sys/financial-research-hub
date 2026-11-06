@@ -47,9 +47,11 @@ The baseline joins saved records, exact lookup, source-linked briefs, scoped his
 | Overseas rating events | The optional yfinance adapter represents Yahoo-aggregated institutional events. Its live dependency and source call remain unverified. It does not provide all investment-bank research. |
 | Local research | Exact record lookup, query-scoped briefs, history and research packs have synthetic service and page acceptance. JSON packs preserve provenance, coverage, history and chunks. Markdown page exports contain a material summary. |
 | MCP | Actual official SDK stdio acceptance passed the version 0.3.0 eleven-tool interface in `auto` and `legacy` modes, with both owned children exiting 0 and the synthetic database hash unchanged. External-editor installation and visible notice display remain separate acceptance work. |
-| Numerical workbench extension | Version 0.3.0 passed 95 tests, twelve read-only HTTP checks over four imported non-demo dataset kinds, and actual Safari chart/navigation checks at 1440×896 and 834×904. Review-packet Blob inspection passed with physical download suppressed. No model ran. Physical iPad, external-editor display, two-model execution, physical download and current remote CI retain their separate pending scopes. |
+| Numerical workbench extension | Version 0.3.0 passed 95 tests, twelve read-only HTTP checks over four imported non-demo dataset kinds, and actual Safari chart/navigation checks at 1440×896 and 834×904. Review-packet Blob inspection passed with physical download suppressed. No model ran. Physical iPad, external-editor display, two-model execution and physical download retain their separate pending scopes. |
 
 The [coverage matrix](COVERAGE.md) contains surface and source limits. The [acceptance record](ACCEPTANCE.md) distinguishes fixed historical versions from later changes. Test totals and public CI status belong to the version that actually ran them.
+
+The fixed functional commit [30e8d2087238bbee512f0826041eed1f2399506b](https://github.com/alysaallena-sys/financial-research-hub/commit/30e8d2087238bbee512f0826041eed1f2399506b) passed [Actions run 42263898429](https://github.com/alysaallena-sys/financial-research-hub/actions/runs/42263898429) on Python 3.11 and 3.13, including base tests, pinned SDK installation and actual stdio tests. All 42 published file blobs matched local Git hashes. Later documentation-only commits require a separate CI readback.
 
 ## Source and adaptation roles
 

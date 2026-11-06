@@ -185,6 +185,8 @@ python -B -m unittest discover -s tests -v
 
 Offline tests use synthetic inputs without calling live financial interfaces, invoking models or downloading reports. GitHub Actions runs the same test entry point with read-only repository permissions. A passing workflow does not establish that a third-party interface is currently available.
 
+The fixed version 0.3.0 functional commit [30e8d2087238bbee512f0826041eed1f2399506b](https://github.com/alysaallena-sys/financial-research-hub/commit/30e8d2087238bbee512f0826041eed1f2399506b) passed [Actions run 42263898429](https://github.com/alysaallena-sys/financial-research-hub/actions/runs/42263898429) on Python 3.11 and 3.13, including base tests, pinned SDK installation and actual stdio tests. All 42 published file blobs matched local Git hashes. This evidence applies to that functional commit; later documentation-only commits need their own CI readback. Physical iPad, external-editor display, actual local-model review and physical-download acceptance remain separate gaps.
+
 Read the [acceptance scope](docs/ACCEPTANCE.md), [contribution rules](CONTRIBUTING.md) and [security notes](SECURITY.md). A new source needs documented coverage, rights boundaries, failure behavior and notice-retention checks.
 
 ## License and risk

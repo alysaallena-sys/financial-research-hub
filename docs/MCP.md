@@ -122,7 +122,9 @@ An SDK stdio pass demonstrates that transport and interface under the tested SDK
 
 Local version 0.3.0 acceptance on 2026-11-06 passed all 95 tests with the optional SDK installed and no skips. The standalone helper separately passed the actual eleven-tool interface in both protocol modes. It checked four fixed resources, two exact-object templates, two prompts, structured/text notices, saved dataset fingerprints, row/chunk notices, comparisons, unexecuted local-review state and error handling. Each of its two exact owned children exited with return code 0; the synthetic database hash remained unchanged.
 
-The HTTP and Safari checks have their own scope in [ACCEPTANCE.md](ACCEPTANCE.md). External-editor installation and visible rendering, physical iPad use, actual execution of local reviewer models, physical browser downloads and current-version remote CI remain separate pending work. Earlier 58-test and metadata-only interface receipts remain historical results; do not reuse them as proof for a later interface.
+The HTTP and Safari checks have their own scope in [ACCEPTANCE.md](ACCEPTANCE.md). External-editor installation and visible rendering, physical iPad use, actual execution of local reviewer models and physical browser downloads remain separate pending work. Earlier 58-test and metadata-only interface receipts remain historical results; do not reuse them as proof for a later interface.
+
+The fixed functional commit [30e8d2087238bbee512f0826041eed1f2399506b](https://github.com/alysaallena-sys/financial-research-hub/commit/30e8d2087238bbee512f0826041eed1f2399506b) passed [Actions run 42263898429](https://github.com/alysaallena-sys/financial-research-hub/actions/runs/42263898429) on Python 3.11 and 3.13. Both jobs ran base tests, installed the pinned SDK and passed the actual stdio suite; all 42 published file blobs matched local Git hashes. This is evidence for that functional commit. Later documentation-only commits need their own CI readback.
 
 ## Official implementation references
 
