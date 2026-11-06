@@ -14,4 +14,5 @@ Investing involves risk. Analysis and query results do not constitute investment
 6. Local databases, credentials, acquired reports, personal configuration and logs must stay out of Git. Publish only reviewed project files.
 7. Keep paid services, remote models, notifications, trading and public network exposure disabled unless separately authorized.
 8. Prefer existing modules over new services. Use deterministic code for diffing and arithmetic. Test warning retention, state changes, source parsing and network boundaries.
+9. Use English as the primary language for repository descriptions, README files, documentation, templates and new commit messages. Preserve the exact Chinese risk notice and the product's localized UI.
 

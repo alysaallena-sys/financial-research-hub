@@ -1,22 +1,22 @@
-# 安全说明
+# Security
 
 投资有风险，分析结果和查询结果不构成投资建议。
 
-本项目面向个人本地研究。默认页面只监听回环地址。HTTP 页面只读，不提供任意命令执行、任意 URL 代理、交易或账户操作。
+This project supports personal, local research. The default server binds only to loopback. Its HTTP interface is read-only. It provides no arbitrary command execution, arbitrary URL proxy, trading or account operations.
 
-## 使用边界
+## Usage boundaries
 
-- 只使用显式选择的来源。保持 TLS 证书校验、超时和大小限制。
-- 公开库不保存密钥、Cookie、个人数据库、原始报告或日志。
-- 内容链接与来源文字均视为不可信输入。显示时转义文本，限制链接协议。
-- 不将本地服务直接暴露到公网。需要远程访问时，单独评估鉴权、网络隔离及来源使用条件。
-- 任何模型或外部编辑器集成都需要检查实际发送内容，并保留可见风险提示。
+- Use only explicitly selected sources. Preserve TLS certificate verification, timeouts and size limits.
+- Keep secrets, cookies, personal databases, acquired reports and logs out of the public repository.
+- Treat source links and text as untrusted input. Escape displayed text and restrict link protocols.
+- Do not expose the local service directly to the public internet. Review authentication, network isolation and source terms before enabling remote access.
+- Inspect actual outbound content before integrating a model or external editor. Preserve the visible risk notice.
 
-## 报告问题
+## Reporting a concern
 
-如仓库启用了 GitHub 私密漏洞报告，请通过该入口提交。否则，先发不含敏感细节的 Issue，说明需要私下联系维护者。不要公开密钥、Cookie、个人数据、可直接利用的攻击细节或第三方完整研报。
+Use GitHub private vulnerability reporting if the repository enables it. Otherwise, open an issue without sensitive details and ask the maintainer for a private contact method. Do not publish secrets, cookies, personal data, immediately exploitable details or complete third-party reports.
 
-## 发布检查
+## Publication checks
 
-公开发布前，检查待提交文件、依赖、来源配置和输出样例。离线测试不能证明真实来源可用、完整或已授权。仓库声明也不能技术强制未知编辑器遵守风险提示要求。
+Before publication, review the proposed files, dependencies, source configuration and output examples. Offline tests do not establish live availability, completeness or source permissions. Repository terms cannot technically force an unrelated editor to display the risk notice.
 

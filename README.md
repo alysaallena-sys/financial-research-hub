@@ -1,31 +1,35 @@
-# Financial Research Hub · 金融资讯组合
+# Financial Research Hub
 
 **投资有风险，分析结果和查询结果不构成投资建议。**
 
-**仅限非商用。** 代码适用自定义的 [Financial Research Hub Noncommercial License 1.0](LICENSE)。本项目允许查看源码、非商用研究、修改和分享。商业用途需要相关权利人另行书面授权。它是 source-available 项目，不宣称采用 OSI 开源许可。
+Investing involves risk. Analysis and query results do not constitute investment advice.
 
-把公开新闻、TED 条目、券商研报目录和海外机构评级变化放进一个本地工作台。记录来源与时间，比较新增和更新，导出带风险提示的资料，供个人研究使用。
+**Noncommercial use only.** The original software and documentation use the custom [Financial Research Hub Noncommercial License 1.0](LICENSE). You may inspect the source, conduct noncommercial research, modify the project and share it under those terms. Commercial use requires separate written permission from the relevant copyright holders. This is a source-available project; it does not claim an OSI-approved open-source license.
 
-![Safari 中运行的工作台；画面内容均为合成演示数据](docs/images/demo-workspace.png)
+Bring public news, TED entries, broker-report metadata and overseas analyst-rating events into one local research workspace. Preserve sources and dates, compare new and updated records, and export material with its risk notice for personal research.
 
-## 能做什么
+The bundled interface currently uses Simplified Chinese. Repository documentation is English-first. The required Chinese risk notice remains unchanged in the interface and output contract.
 
-| 信息 | 第一版范围 |
+![The workspace running in Safari; all content shown is synthetic demo data](docs/images/demo-workspace.png)
+
+## Features
+
+| Information | Initial scope |
 | --- | --- |
-| 公开新闻与 TED | 读取固定公开 RSS/Atom 源的标题、链接、日期和短摘要 |
-| 国内券商研报 | 查询东方财富提供的个股、行业、宏观、策略与券商晨报元数据 |
-| 海外机构评级 | 通过可选的 yfinance 适配器读取 Yahoo 聚合的评级事件 |
-| 变化记录 | 保存本地 SQLite 快照，区分首次观察、新增、更新和未变 |
-| 查询与简报 | 按类型、来源、证券代码或关键词筛选，生成可追溯的资料简报 |
-| 知识库导出 | JSON、CSV、Markdown 与检索分块保留风险提示、来源和演示标记 |
+| Public news and TED | Titles, links, publication dates and short summaries from fixed public RSS/Atom sources |
+| Chinese broker research | Eastmoney metadata for stock, industry, macro, strategy and broker morning reports |
+| Overseas analyst ratings | Yahoo-aggregated rating events through the optional yfinance adapter |
+| Change history | Local SQLite snapshots that distinguish first observation, new records, updates and unchanged records |
+| Search and briefs | Filters for type, source, symbol and keywords, plus source-linked metadata briefs |
+| Knowledge-base exports | JSON, CSV, Markdown and retrieval chunks that retain risk notices, sources and demo labels |
 
-研报目录包含哪些字段，取决于具体接口。目录记录不等于研报全文。评级事件也不等于投行的完整论证。不同程序共用东方财富或 Yahoo 时，仍是同一直接数据来源。
+Available report fields depend on the selected interface. A report-list record does not contain the report's full text. A rating event does not contain an investment bank's complete reasoning. Programs that share Eastmoney or Yahoo still share the same direct data provider.
 
-## 快速开始：先运行合成演示
+## Quick start with synthetic data
 
-需要 Python 3.11 或更高版本。基础功能使用 Python 标准库，不要求模型账号或数据 API key。
+Use Python 3.11 or later. The base application uses the Python standard library and does not require a model account or a data API key.
 
-在项目目录运行：
+Clone the repository and start the demo:
 
 ```sh
 git clone https://github.com/alysaallena-sys/financial-research-hub.git
@@ -34,11 +38,11 @@ python -m finance_research_hub --db .local/demo.sqlite3 demo
 python -m finance_research_hub --db .local/demo.sqlite3 serve --demo --port 8765
 ```
 
-然后打开 [本地工作台](http://127.0.0.1:8765)。演示内容均为合成样例。它们不代表真实新闻、真实机构观点或当前行情。
+Open the [local workspace](http://127.0.0.1:8765). All demo entries are synthetic. They do not represent actual news, institutional opinions or current market data.
 
-服务默认只绑定本机回环地址。它不会自动向互联网发布页面。上述命令将演示记录放入 `.local/demo.sqlite3`，与默认的 `.local/research.sqlite3` 分开。关闭服务时，在启动它的终端按 `Ctrl+C`。
+The server binds to the local loopback address. It does not publish the page to the internet. These commands keep demo records in `.local/demo.sqlite3`, separate from the default `.local/research.sqlite3`. Press `Ctrl+C` in the server's terminal to stop it.
 
-## 查询、简报和导出
+## Search, briefs and exports
 
 ```sh
 python -m finance_research_hub --db .local/demo.sqlite3 query --kind research
@@ -49,11 +53,11 @@ python -m finance_research_hub --db .local/demo.sqlite3 export --format json
 python -m finance_research_hub --db .local/demo.sqlite3 export --format jsonl
 ```
 
-具体参数以 `python -m finance_research_hub --help` 及子命令帮助为准。`--db` 省略时使用 `.local/research.sqlite3`。JSON 同时提供记录与带提示的检索分块；JSONL 按分块输出。空结果的 JSONL 和 CSV 仍输出一条 `record_type: notice` 提示记录；它不是资料条目，导入时应先区分类型。查询和导出只读取本地库。它们不会暗中发起采集、模型调用或 PDF 下载。
+Use `python -m finance_research_hub --help` and each subcommand's help for the current options. Omitting `--db` selects `.local/research.sqlite3`. JSON includes records and retrieval chunks with notices; JSONL emits one chunk per line. Empty JSONL and CSV exports still contain one `record_type: notice` entry. It is a notice, not a research item; importers must distinguish the types. Search and export read the local database without starting collection, model calls or PDF downloads.
 
-## 可选的实时元数据采集
+## Optional live metadata collection
 
-演示模式之外，采集需要显式的 `--live`。先核对 [来源说明](docs/SOURCES.md)，再选择允许使用的来源。以下命令说明功能入口，不表示第三方接口已经完成运行验收：
+Collection requires an explicit `--live` flag. Review the [source notes](docs/SOURCES.md) before choosing a source that permits your intended use. These examples show entry points. The bounded source checks described below do not establish complete or ongoing coverage:
 
 ```sh
 python -m finance_research_hub collect --source bbc --live
@@ -62,66 +66,66 @@ python -m finance_research_hub collect --source ted --live
 python -m finance_research_hub collect --source eastmoney --symbol 600519 --live
 ```
 
-研报类型可选 `stock`、`industry`、`strategy`、`macro`、`morning`。指定股票时使用 `--symbol`；指定行业时使用 `--industry`。用 `--begin`、`--end` 明确日期，并用 `--max-pages`、`--page-size` 限定结果。程序默认查询最近 7 天；最多 10 页，每页最多 100 条。结果会保留覆盖或截断状态。
+Report types are `stock`, `industry`, `strategy`, `macro` and `morning`. Use `--symbol` for a stock and `--industry` for an industry. Set `--begin` and `--end` to make the date range explicit. Bound the request with `--max-pages` and `--page-size`. The default range is the past seven days, with a hard limit of 10 pages and 100 entries per page. Results retain coverage and truncation information.
 
 ```sh
 python -m finance_research_hub collect --source eastmoney --report-type macro --begin 2026-01-01 --end 2026-01-07 --max-pages 1 --page-size 20 --live
 ```
 
-此处的固定日期只是参数示例，不代表已取得该期间的完整数据。
+The fixed dates above are parameter examples. They do not establish complete data for that period.
 
-海外评级适配器需要用户自行安装可选依赖：
+Install the optional dependency explicitly before using the overseas ratings adapter:
 
 ```sh
 python -m pip install '.[ratings]'
 python -m finance_research_hub collect --source yahoo --symbol AAPL --live
 ```
 
-安装依赖会连接软件包源。实时采集会连接相应数据源。任何采集都有超时、分页或数量上限。请结合返回的覆盖信息判断结果，不能把有限页面当成完整历史。
+Dependency installation connects to a package source. Live collection connects to the selected provider. Requests have timeout, pagination or quantity limits. Read the returned coverage information; a bounded page set does not establish a complete history.
 
-如果 Python 的 CA 配置不完整，而系统 `curl` 可以正常验证来源证书，可显式选择系统传输：
+If Python's CA configuration is incomplete and the system `curl` can verify the source certificate, select the system transport explicitly:
 
 ```sh
 python -m finance_research_hub collect --source bbc --transport curl --live
 ```
 
-该选项只适用于 RSS 和东方财富适配器。它继续校验 HTTPS 证书，并逐跳核对来源白名单。它不会关闭证书验证，也不会修改系统信任设置。yfinance 使用自己的网络实现，不接受此覆盖选项。
+This option applies only to RSS and Eastmoney adapters. It keeps HTTPS certificate validation and checks each redirect against the source allowlist. It does not disable certificate checks or change system trust settings. yfinance uses its own network implementation and rejects this override.
 
-2026-11-06的小样本核查已取得BBC、Guardian和东方财富一页研报元数据。TED的官方跳转链已核，本次最终网络请求失败，当前保留待验状态。海外评级的可选依赖尚未运行验收。详见[验收范围](docs/ACCEPTANCE.md)。
+Bounded checks on 2026-11-06 retrieved BBC and Guardian feed metadata and one page of Eastmoney report metadata. The official TED redirect chain was checked, but the final network request failed; TED collection remains unverified. The optional overseas ratings dependency has not received runtime acceptance. See the [acceptance scope](docs/ACCEPTANCE.md).
 
-本项目不内置付费研报库、不采集付费媒体、不下载研报 PDF、不执行交易，也不自动运行模型、通知或定时任务。第三方访问失败时，应保留失败状态；不要绕过来源限制。
+The project does not bundle paid report databases, collect paid media, download report PDFs, execute trades, or automatically run models, notifications or scheduled jobs. Preserve a source-access failure as a failure. Do not bypass source restrictions.
 
-## 导入编辑器、智能体或知识库
+## Editor, agent and knowledge-base integration
 
-**任何使用本项目构建知识库的集成方，都必须让编辑器在查询结果和分析结果中可见展示：**
+**Every integration that uses this project to build a knowledge base must make the editor visibly display this exact Chinese notice with query and analysis results:**
 
 > 投资有风险，分析结果和查询结果不构成投资建议。
 
-保留每条记录、每个检索分块和导出文件中的同一提示。仅存入隐藏元数据、仅放在许可页面或仅显示一次弹窗，都不满足项目集成条件。
+Retain the same notice in every record, retrieval chunk and export. Hidden metadata, a license page alone, or a one-time dialog does not satisfy the integration conditions.
 
-- 机器可读协议：[integrations/editor-contract.json](integrations/editor-contract.json)
-- 集成与验收步骤：[integrations/editor-instructions.md](integrations/editor-instructions.md)
-- 项目智能体规则：[AGENTS.md](AGENTS.md)
+- Machine-readable contract: [integrations/editor-contract.json](integrations/editor-contract.json)
+- Integration and acceptance steps: [integrations/editor-instructions.md](integrations/editor-instructions.md)
+- Project agent rules: [AGENTS.md](AGENTS.md)
 
-本仓库能在自带页面、CLI 和导出路径中实现提示保留。它无法从技术上强制未知的第三方编辑器执行规则。外部集成方必须检查最终显示效果，不得宣称未验收的集成已经合规。
+The bundled page, CLI and export paths implement notice retention. This repository cannot technically force an unrelated editor to follow the rules. External integrators must check the final display and must not claim compliance before that check passes.
 
-## 数据与隐私
+## Data and privacy
 
-本地数据库、日志、凭据、真实采集结果和取得的原始研报不应进入公开仓库。`.gitignore` 已排除常见本地状态。发布前仍需检查实际文件清单。公开仓库只包含程序、文档、测试及明确标记的合成样例。
+Keep local databases, logs, credentials, live collection results and acquired original reports out of the public repository. `.gitignore` excludes common local state; still inspect the actual file list before publishing. The public repository contains code, documentation, tests and clearly labeled synthetic examples.
 
-每条内容应区分原发布机构与直接数据提供方，并保留发表时间、采集时间和当前覆盖状态。公开可读不等于允许批量保存或再分发。软件许可也不替代数据、文章或研报的使用条件。
+Distinguish the original publishing institution from the direct data provider. Retain publication time, retrieval time and coverage status. Public access does not by itself authorize bulk storage or redistribution. A software license does not replace the terms governing data, articles or research reports.
 
-## 验证与贡献
+## Validation and contributions
 
 ```sh
 python -B -m unittest discover -s tests -v
 ```
 
-离线测试使用合成输入。测试不请求真实金融接口，不调用模型，不下载报告。GitHub Actions 使用只读仓库权限运行同一测试入口。工作流通过与第三方接口当前可用，是两种不同证据。
+Offline tests use synthetic inputs without calling live financial interfaces, invoking models or downloading reports. GitHub Actions runs the same test entry point with read-only repository permissions. A passing workflow does not establish that a third-party interface is currently available.
 
-阅读 [验收范围](docs/ACCEPTANCE.md)、[贡献规则](CONTRIBUTING.md) 和 [安全说明](SECURITY.md)。新增来源时，要补充接口覆盖、权利边界、失败行为及风险提示保留验证。
+Read the [acceptance scope](docs/ACCEPTANCE.md), [contribution rules](CONTRIBUTING.md) and [security notes](SECURITY.md). A new source needs documented coverage, rights boundaries, failure behavior and notice-retention checks.
 
-## 授权与风险
+## License and risk
 
-[LICENSE](LICENSE) 和 [NOTICE](NOTICE) 约束本项目原创代码及文档。第三方包和数据继续适用原条款。项目不保证数据完整、准确或及时，不保证投资收益，也不提供投资、法律或税务建议。
+[LICENSE](LICENSE) and [NOTICE](NOTICE) govern the project's original software and documentation. Third-party packages and data retain their own terms. The project does not guarantee complete, accurate or timely data, does not guarantee returns, and does not provide investment, legal or tax advice.
 

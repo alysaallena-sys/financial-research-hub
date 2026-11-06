@@ -1,61 +1,62 @@
-# 验收范围
+# Acceptance Scope
 
 投资有风险，分析结果和查询结果不构成投资建议。
 
-此文件区分源码实现、合成测试、本机页面、第三方来源及公开发布。任何层的通过都不能替代另一层。
+Investing involves risk. Analysis and query results do not constitute investment advice.
 
-## 2026-11-06 本机验收
+This file separates source implementation, synthetic tests, local pages, third-party sources and public publication. A pass at one layer does not replace acceptance at another layer.
 
-| 层级 | 通过条件 | 已观察结果 |
+## Local acceptance on 2026-11-06
+
+| Layer | Pass condition | Observed result |
 | --- | --- | --- |
-| 离线核心与解析测试 | 新增、更新、重放、来源区分、过滤、分页与传输边界 | 完整离线套件39项通过；合成输入与内存状态 |
-| 风险提示 | CLI、API、简报、逐条导出与逐个检索分块保留提示 | 独立契约测试通过；Safari页面与简报可见；外部编辑器未验 |
-| 本地 HTTP | 输出格式、空结果、错误参数、来源边界与只读约束 | 13项实际回环请求检查通过；四格式非空/空结果、400/403/404/405均保留提示 |
-| 本地页面 | 筛选、变化记录、来源状态和简报 | 原生Safari：全部返回4条合成记录，研报筛选返回1条，简报按当前查询生成；HTTP导出格式通过，未执行浏览器下载文件验收 |
-| 窄屏与 iPad | 排版、触摸目标与筛选仍可用 | Safari实际视口1440×896、834×1008无横向溢出；可见表单和操作控件最小高44px；滚动650px后风险条仍可见；真实iPad未验 |
-| BBC / Guardian | 一次有界公开RSS元数据连接 | 显式系统curl、保留证书校验：分别返回54条、20条；只证明该次来源窗口，不证明持续可用或全文权利 |
-| 东方财富 | 一页非空元数据与覆盖标记 | 个股历史样本：600519，2025-04-01至2025-04-30，每页5条、最多1页，返回5条；上游报告总页数5，truncated=true；其他四类仅合成测试 |
-| TED | 官方来源与网络路径 | 官方起始地址的跳转链已核；本次最终系统curl请求失败（exit56），保持未验可用状态；没有绕过TLS或访问限制 |
-| 海外可选依赖 | 实际版本、调用链和返回字段验收 | 未执行；不由基础测试覆盖 |
-| 外部编辑器集成 | 在目标编辑器的真实查询和分析结果中看见风险提示 | 未执行；机器协议不等于显示验收 |
-| 公开仓库 | 文件清单排除本地状态及第三方内容；远程读回提交和声明 | 已发布Public仓库；初次完整发布fa44246的26个文件逐项Git blob哈希与本地一致；匿名Safari可读取 |
-| GitHub Actions | 远程工作流实际完成并读回结果 | 初次完整发布的Python3.11、3.13两个任务均成功；见下方固定回执 |
+| Offline core and parser tests | New records, updates, replay, source separation, filtering, pagination and transport boundaries | All 39 offline tests passed, using synthetic input and in-memory state |
+| Risk notice | Preserve the notice in CLI, API, briefs, each exported record and every retrieval chunk | Independent contract tests passed; the notice was visible on Safari pages and in the brief; external editors remain unverified |
+| Local HTTP | Output formats, empty results, invalid parameters, source boundaries and read-only constraints | 13 actual loopback-request checks passed; nonempty/empty results in four formats and 400/403/404/405 responses retained the notice |
+| Local page | Filtering, change records, source status and briefs | Native Safari returned 4 synthetic records for all items and 1 for the research filter; the brief used the current query. HTTP export formats passed; browser file-download acceptance was not performed |
+| Narrow viewport and iPad | Layout, touch targets and filtering remain usable | Safari's actual 1440×896 and 834×1008 viewports had no horizontal overflow; visible form and action controls had a minimum height of 44px; the risk bar remained visible after 650px of scrolling; a physical iPad remains unverified |
+| BBC / Guardian | One bounded public-RSS metadata connection | Explicit system curl with certificate verification enabled returned 54 and 20 records respectively. This proves only that source window on that occasion, not continuous availability or full-text rights |
+| Eastmoney | One nonempty metadata page and coverage markers | Historical company sample: 600519, 2025-04-01 through 2025-04-30, 5 records per page and at most 1 page. It returned 5 records; the upstream reported 5 total pages, with `truncated=true`. The other four report types have synthetic-test coverage only |
+| TED | Official source and network path | The redirect chain from the official starting URL was checked; the final system-curl request failed in this check (exit 56). Availability remains unverified. No TLS or access restriction was bypassed |
+| Optional overseas ratings adapter (yfinance/Yahoo) | Actual version, call chain and returned-field acceptance | Not performed; the base tests do not cover it |
+| External-editor integration | A visible risk notice in real query and analysis results in the target editor | Not performed; a machine contract is not display acceptance |
+| Public repository | Exclude local state and third-party content from the file list; read back remote commits and notices | Published as a Public repository. All 26 files in the first complete publication, fa44246, matched local Git blob hashes; anonymous Safari could read it |
+| GitHub Actions | Remote workflow completes and its result is read back | Both Python 3.11 and 3.13 jobs for the first complete publication succeeded; see the fixed receipt below |
 
-项目维护者可根据实际回执更新状态。记录测试命令、实际结果和证据引用。没有执行的项继续保留未验状态。不要填写预计通过，也不要把截图存在等同于整条流程通过。
+Maintainers may update status from actual receipts. Record the test command, observed result and evidence reference. Keep unperformed checks marked unverified. Do not record an expected pass or treat a screenshot's existence as proof that the entire flow passed.
 
-完整离线入口：`python -B -m unittest discover -s tests -v`。JavaScript `node --check` 通过。上述来源连接检查没有保存或公开第三方正文，也没有把真实内容混入合成演示库。
+The complete offline entry point is `python -B -m unittest discover -s tests -v`. JavaScript `node --check` passed. The source-connection checks above did not save or publish third-party full text or mix real content into the synthetic demo database.
 
-本机默认Python CA链检查失败。显式系统curl使用其正常信任后端后，BBC、Guardian和上述研报样本成功。实现没有关闭证书验证，也没有修改系统信任。可选传输有独立mock审阅；POST不跨origin，GET跳转仍受固定HTTPS主机白名单约束。
+The default local Python CA-chain check failed. After explicit system curl used its normal trust backend, BBC, Guardian and the report sample above succeeded. The implementation did not disable certificate verification or modify system trust. The optional transport received an independent mock review; POST requests cannot redirect across origins, and GET redirects remain subject to a fixed HTTPS-host allowlist.
 
-页面预览为实际Safari中的合成数据：[工作台截图](images/demo-workspace.png)。浏览器控制台出现过受CSP阻止的内联样式信息；项目未因此放宽CSP。页面功能与布局按上表逐项观察，不宣称控制台零信息。
+The page preview shows synthetic data in actual Safari: [workbench screenshot](images/demo-workspace.png). The browser console showed messages about CSP-blocked inline styles; the project did not relax CSP in response. The table above records observed page functions and layout. It does not claim an empty console.
 
-初次完整发布：[fa442465786a6c2e8ec200f41059a92dd8e6d6ca](https://github.com/alysaallena-sys/financial-research-hub/commit/fa442465786a6c2e8ec200f41059a92dd8e6d6ca)。对应远程[Offline tests运行42245387434](https://github.com/alysaallena-sys/financial-research-hub/actions/runs/42245387434)已读取为success，两个Python版本均成功。该回执指向固定版本；后续提交的结果以对应Actions运行记录为准。
+First complete publication: [fa442465786a6c2e8ec200f41059a92dd8e6d6ca](https://github.com/alysaallena-sys/financial-research-hub/commit/fa442465786a6c2e8ec200f41059a92dd8e6d6ca). The corresponding [Offline tests run 42245387434](https://github.com/alysaallena-sys/financial-research-hub/actions/runs/42245387434) was read back as success, with both Python versions successful. This receipt refers to a fixed version. Results for later commits must come from their corresponding Actions run records.
 
-## 已完成的独立离线契约检查
+## Completed independent offline contract checks
 
-命令：
+Command:
 
 ```sh
 python -B -m unittest discover -s tests -p test_notice_contract.py -v
 ```
 
-2026-11-06 的本地检查共 14 项，全部通过。测试使用内存 SQLite、内存 HTTP 请求和合成研报输入。它不打开监听端口、不创建采集数据库、不请求真实来源，也不下载报告。
+All 14 local checks passed on 2026-11-06. They used in-memory SQLite, in-memory HTTP requests and synthetic research-report input. They did not open a listening port, create a collection database, request real sources or download reports.
 
-已核对范围：
+Reviewed scope:
 
-- 许可 ID、机器协议与固定风险文本一致。
-- 导入内容和额外字段不能移除强制提示或非商用标记。
-- 查询、确定性简报及 JSON、JSONL、CSV、Markdown 的每条记录或分块保留提示。
-- 空导出保留可解析的 notice-only 提示，且不伪装真实资料。
-- CLI 参数、未授权实时采集与数据库错误均输出风险提示。
-- 内存 HTTP 流程的空结果、错误、未知入口、写方法、错误 Host/Origin 均返回带提示的拒绝或结果。
-- 非回环绑定在创建服务器前遭拒绝；来源 allowlist 拒绝任意目标；合成研报查询未发起 PDF 下载。
+- The license ID, machine contract and fixed risk text agree.
+- Imported content and extra fields cannot remove mandatory notices or the noncommercial flag.
+- Queries, deterministic briefs and each record or chunk in JSON, JSONL, CSV and Markdown retain the notice.
+- Empty exports retain a parseable notice-only entry without impersonating real material.
+- CLI argument, unauthorized live-collection and database errors all include the risk notice.
+- In-memory HTTP flows return noticed results or rejections for empty results, errors, unknown endpoints, write methods and invalid Host/Origin.
+- Non-loopback binding is rejected before server creation; the source allowlist rejects arbitrary targets; synthetic report queries did not initiate PDF downloads.
 
-这些检查证明输出契约和所测代码分支的行为。它们不证明真实浏览器已显示提示，也不证明第三方来源、外部编辑器、公开仓库或远程 CI 已完成验收。
+These checks establish the output contract and the tested code branches. They do not establish that a real browser displayed the notice or that third-party sources, external editors, the public repository or remote CI passed acceptance.
 
-## 出版与知识库边界
+## Publication and knowledge-base boundaries
 
-公开发布只包含项目代码、文档、测试和明确标注的合成样例。第三方文章、报告和数据不因项目的非商用许可而获得再分发许可。
+Public publication includes only project code, documentation, tests and clearly marked synthetic examples. This project's noncommercial license does not grant redistribution rights to third-party articles, reports or data.
 
-外部编辑器集成应按 [集成验收步骤](../integrations/editor-instructions.md) 单独检查。项目无法保证所有外部软件遵守约定。声明中必须区分合同与文档要求、内置输出保留，以及真实外部编辑器验收。
-
+Check each external-editor integration separately using the [integration acceptance steps](../integrations/editor-instructions.md). The project cannot guarantee that every external application follows the contract. Claims must distinguish contractual and documentation requirements, retention in built-in outputs and actual acceptance in an external editor.

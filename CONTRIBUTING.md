@@ -1,24 +1,25 @@
-# 贡献规则
+# Contributing
 
 投资有风险，分析结果和查询结果不构成投资建议。
 
-提交贡献即表示你有权提交相关内容，并同意将该贡献按本项目的 [非商用许可](LICENSE) 提供。不要提交第三方研报全文、凭据、个人资料或无权再分发的数据。
+By contributing, you confirm that you can submit the material and offer it under this project's [noncommercial license](LICENSE). Do not submit third-party report full text, credentials, personal information, or data you cannot redistribute.
 
-1. 先复用现有模块。说明新增来源或功能解决的具体问题。
-2. 让采集保持显式、只读和有界。保留 TLS 校验、超时和响应大小上限。
-3. 不绕过登录、付费墙、CAPTCHA 或来源网站限制。
-4. 将目录元数据、公开正文、机构观点和程序生成的分析分开。
-5. 为来源保留直接 provider、原发布机构、发表时间、采集时间及覆盖状态。
-6. 风险提示必须出现在每次查询、分析、导出记录和检索分块中。UI 必须可见展示同一提示。
-7. 在离线测试中验证新增、更新、重放、过滤、风险提示和异常输入。不要让 CI 请求真实来源。
-8. 使用合成样例。说明样例覆盖范围，避免伪造实时成功、机构观点或收益。
-9. 发布前查看 Git 文件清单。不要提交 `.local/`、数据库、日志、`.env`、API key、Cookie 或 PDF。
+1. Reuse existing modules first. State the specific problem a new source or feature solves.
+2. Keep collection explicit, read-only and bounded. Preserve TLS verification, timeouts and response-size limits.
+3. Do not bypass logins, paywalls, CAPTCHAs or source-site restrictions.
+4. Distinguish catalog metadata, public full text, institutional opinions and generated analysis.
+5. Preserve the direct provider, original publisher, publication time, retrieval time and coverage status.
+6. Include the exact Chinese risk notice with every query, analysis, exported record and retrieval chunk. Display it visibly in the UI.
+7. Test additions, updates, replay, filtering, notice retention and invalid input offline. Do not make CI request live sources.
+8. Use labeled synthetic examples. State their scope. Do not fabricate live success, institutional views or returns.
+9. Review the Git file list before publication. Exclude `.local/`, databases, logs, `.env`, API keys, cookies and PDFs.
+10. Use English as the primary language for repository descriptions, README files, documentation, templates and new commit messages. Preserve the required Chinese risk notice and product UI localization.
 
-基础验证命令：
+Run the base checks:
 
 ```sh
 python -B -m unittest discover -s tests -v
 ```
 
-PR 说明应写清问题、最终行为、验证结果和未验范围。使用第三方代码时，先核对原许可和署名要求，并在 `docs/SOURCES.md` 记录具体文件与版本。仅参考接口或设计，不等于已复制该项目代码。
+In a pull request, describe the problem, resulting behavior, validation and remaining gaps. Before using third-party code, check its license and attribution requirements. Record the exact files and versions in `docs/SOURCES.md`. An interface or design reference does not mean this project copied the referenced code.
 

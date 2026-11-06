@@ -1,30 +1,30 @@
-# 编辑器与知识库集成规则
+# Editor and knowledge-base integration
 
 **投资有风险，分析结果和查询结果不构成投资建议。**
 
-本规则适用于使用本项目程序、导出格式或集成设施的编辑器、智能体、RAG 服务和个人知识库。集成用途必须符合 [LICENSE](../LICENSE) 的非商用要求。
+These rules apply to editors, agents, RAG services and personal knowledge bases that use this project's software, export formats or integration facilities. The integration must comply with the noncommercial requirements in [LICENSE](../LICENSE).
 
-## 必须实现的结果
+## Required visible result
 
-每次向用户展示查询结果或分析结果时，在结果正文或紧邻结果的持久提示栏中显示以下原文：
+Every time you show a query or analysis result to a user, display this exact Chinese notice in the result text or in a readable persistent banner next to it:
 
 > 投资有风险，分析结果和查询结果不构成投资建议。
 
-显示区应可读。隐藏元数据、折叠的条款页面和仅出现一次的弹窗不能替代该提示。
+The bundled product uses a Simplified Chinese interface. Preserve the required Chinese notice even if an integrating editor uses another interface language. Hidden metadata, collapsed terms and a one-time dialog do not replace visible display.
 
-## 接入步骤
+## Integration steps
 
-1. 阅读 [机器协议](editor-contract.json)、项目许可和来源使用条件。
-2. 将下方规则加入所用编辑器的项目规则或知识库系统指令。
-3. 在导入前检查每条记录的 `risk_notice`、来源、日期和 `is_demo`。缺失时拒绝导入，或先重新生成完整导出。
-4. 分块时将风险提示同时写入分块正文和分块元数据。仅继承父文档元数据不够。
-5. 检索与模型调用时保留提示、出处、时间及演示标记。不要把未知字段补成事实。
-6. 在最终回答渲染层固定显示提示。不要依赖模型偶尔遵守提示词。
-7. 按下方验收步骤核对最终页面，再声明集成完成。
+1. Read the [machine-readable contract](editor-contract.json), the project license and the source terms.
+2. Add the rules below to the editor's project rules or the knowledge base's system instructions.
+3. Before import, check every record's `risk_notice`, source, date and `is_demo`. Reject incomplete records or regenerate a complete export first.
+4. When splitting content, retain the notice in both the chunk text and chunk metadata. Inheriting only parent-document metadata is insufficient.
+5. Preserve the notice, citations, times and demo labels during retrieval and model calls. Do not replace unknown fields with invented facts.
+6. Implement a fixed notice in the final answer renderer. Do not rely solely on a model following a prompt.
+7. Check the final interface using the acceptance steps below before claiming that integration is complete.
 
-JSONL 与 CSV 的空结果会输出 `record_type: notice` 行，用来保留提示。它不是真实资料，导入器不得把它计作一篇报告或新闻。非空 JSONL 使用 `record_type: chunk`；非空 CSV 使用 `record_type: record`。
+Empty JSONL and CSV results contain a `record_type: notice` entry to retain the warning. It is not source material; an importer must not count it as a report or news item. Nonempty JSONL uses `record_type: chunk`; nonempty CSV uses `record_type: record`.
 
-以下规则可加入 Cursor、VS Code、Obsidian 或其它编辑器的相应项目规则中。不同产品的规则入口和渲染能力不同；请使用其实际支持的机制。
+You can add the following rules to the appropriate project-rule mechanism in Cursor, VS Code, Obsidian or another editor. Products expose different rule entry points and rendering capabilities; use the mechanisms the selected product actually supports.
 
 ```text
 Financial Research Hub integration rules:
@@ -39,17 +39,17 @@ Financial Research Hub integration rules:
 - Do not bypass source access controls or assume third-party redistribution rights.
 ```
 
-## 集成验收
+## Integration acceptance
 
-用合成记录完成以下检查，不要为验收上传私人研报：
+Use synthetic records for these checks. Do not upload private research reports for acceptance testing.
 
-| 操作 | 可观察通过条件 |
+| Action | Observable pass condition |
 | --- | --- |
-| 导入后搜索一条记录 | 结果旁可见完整中文风险提示；来源和演示标记保留 |
-| 让编辑器生成一段分析 | 分析结果可见同一提示，并区分来源内容与生成推断 |
-| 将文档拆为多个检索分块 | 每个分块正文和元数据均保留提示 |
-| 导出为 JSON、CSV 或 Markdown | 每条记录均保留提示，日期与来源未丢失 |
-| 移除提示后尝试导入 | 集成层拒绝导入，或先重新生成符合协议的数据 |
+| Search for a record after import | The full Chinese notice is visible next to the result; the source and demo labels remain intact |
+| Ask the editor to generate analysis | The result displays the same notice and separates source content from generated inference |
+| Split a document into retrieval chunks | Every chunk retains the notice in its text and metadata |
+| Export JSON, CSV or Markdown | Every record keeps the notice, date and source |
+| Attempt an import after removing the notice | The integration rejects it or first regenerates compliant data |
 
-本仓库可以验证自带输出路径。它无法从技术上控制未知的外部编辑器。集成方负责实现显示层，并保留自己实际测到的验收结果。仅复制本文件或保存 `editor-contract.json`，不能证明编辑器已经满足要求。
+This repository can test its bundled output paths. It cannot technically control an unrelated editor. The integrator must implement the display layer and retain actual acceptance results. Copying this file or saving `editor-contract.json` does not establish that an editor meets the requirements.
 
